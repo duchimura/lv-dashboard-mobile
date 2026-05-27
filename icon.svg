@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0f3460"/>
+  <g fill="#e0e0e0" transform="translate(256,256)">
+    <!-- gear shape -->
+    <path d="M96-14h28l8-42a106 106 0 0 0 30-12l36 22 20-20-22-36a106 106 0 0 0 12-30l42-8v-28l-42-8a106 106 0 0 0-12-30l22-36-20-20-36 22a106 106 0 0 0-30-12l-8-42H-14l-8 42a106 106 0 0 0-30 12l-36-22-20 20 22 36a106 106 0 0 0-12 30l-42 8v28l42 8a106 106 0 0 0 12 30l-22 36 20 20 36-22a106 106 0 0 0 30 12z" transform="scale(0.72) translate(0,-10)"/>
+    <circle r="52" fill="#0f3460" transform="scale(0.72) translate(0,-10)"/>
+    <!-- status dot -->
+    <circle cx="80" cy="80" r="28" fill="#00c853"/>
+  </g>
+</svg>
