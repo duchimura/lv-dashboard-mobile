@@ -1,0 +1,2830 @@
+/* ============================================================
+   UTILITY -is this used anywhere?
+   ============================================================ */
+.hidden {
+  display: none;
+}
+
+#refresh-ws {
+  margin-left: 12px;
+}
+/* ============================================================
+   CORE VARIABLES
+   ============================================================ */
+:root {
+  --card-size: 230px;
+
+  /* Light mode */
+  --bg: #faf9f3;
+  --text: #535c5d;
+  /*--card-bg: #f2f2f2;*/
+  --card-bg: #fff;
+  --header-bg: #e0e0e0;
+  --border: #cccccc;
+}
+
+:root.dark {
+  /* Dark mode */
+  --bg: #1a1a1a;
+  --text: #f0f0f0;
+  --card-bg: #2a2a2a;
+  --header-bg: #333333;
+  --border: #555555;
+}
+
+/* ============================================================
+   GLOBAL
+   ============================================================ */
+body {
+  background: var(--bg);
+  color: var(--text);
+  padding-bottom: 120px;
+  margin: 0;
+}
+
+/* Theme toggle button */
+#zoom-toggle,
+#theme-toggle,
+#grid-reverse-toggle,
+#pause-all-racks,
+#restart-all-racks,
+#stop-all-racks {
+  background: none;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+#stop-all-racks {
+  background: #c0392b !important;
+  color: #fff !important;
+  border-color: #922b21 !important;
+  font-weight: bold;
+}
+#stop-all-racks:hover {
+  background: #e74c3c !important;
+}
+
+#rack-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 100px;
+}
+
+#issues-mode-toggle {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+#header-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+#fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  color: var(--text);
+  padding: 30px 16px 10px;
+  z-index: 99999;
+  min-height: 80px;
+  box-sizing: border-box;
+  text-align: bottom;
+}
+
+#header-drag-handle {
+  position: fixed;
+  top: var(--gap-handle-top, 80px);
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: default;
+  background: rgba(96, 165, 250, 0.18);
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border);
+  z-index: 99999;
+  box-sizing: border-box;
+}
+
+#header-drag-handle:hover {
+  /*background: rgba(96, 165, 250, 0.45);*/
+}
+
+#fixed-header h1 {
+  margin: 0;
+  padding-left: 15px;
+  font-size: 30px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#top-bar {
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+/* find vessel */
+.vessel-search {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-left: 200px;
+}
+
+#vessel-search-input {
+  width: 125px;
+  height: 29px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+#vessel-search-input::placeholder {
+  color: var(--text);
+  opacity: 0.6;
+}
+
+/* search reset button */
+#vessel-search-reset {
+  height: 29px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+#vessel-search-reset:hover {
+  opacity: 0.8;
+}
+
+.card.vessel-highlight {
+  outline: 4px solid red;
+  outline-offset: 1px;
+}
+
+#attention-list {
+  position: fixed;
+  top: calc(var(--gap-handle-top, 80px) + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  padding: 10px 35px 6px;
+  z-index: 99999;
+  font-size: 14px;
+  pointer-events: none;
+  height: auto;
+  box-sizing: border-box;
+}
+
+#attention-list > div {
+  white-space: nowrap;
+}
+
+/* ============================================================
+   DATA TOGGLES FOR BUTTONS
+   ============================================================ */
+.col-toggle {
+  background: none;
+  border: 0.5px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.5;
+}
+
+.col-toggle.active {
+  opacity: 1;
+}
+
+/* ============================================================
+   COLUMN HEADERS
+   ============================================================ */
+.column-headers,
+.grid {
+  padding: 5px;
+}
+.column-headers {
+  position: relative;
+  z-index: 200;
+  margin-top: var(--col-headers-top);
+  top: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: repeat(13, var(--card-size));
+  gap: 6px;
+  margin-bottom: 4px;
+  width: max-content;
+  pointer-events: none;
+}
+
+.column-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-weight: bold;
+  color: var(--text);
+  font-size: 20px;
+}
+
+.column-pause-btn {
+  pointer-events: all;
+  font-size: 18px;
+  font-weight: bold;
+  width: 50%;
+  padding: 3px 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+/* On hover, hide the column number and overlay the pause symbol */
+.column-pause-btn:not(.paused):hover {
+  background: #b33;
+  color: transparent;
+  border-color: #ff6666;
+  box-shadow: 0 0 6px rgba(180, 50, 50, 0.6);
+  align-content: top;
+}
+
+.column-pause-btn:not(.paused):hover::after {
+  content: "⏸";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  color: #fff;
+  font-size: 18px;
+  vertical-align: -4px;
+}
+
+.column-pause-btn:disabled:not(.paused) {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.column-pause-btn.paused:disabled {
+  cursor: default;
+  pointer-events: none;
+}
+
+.column-pause-btn.paused {
+  background: #b86b00;
+  color: #fff;
+  border-color: #ffaa33;
+  box-shadow: 0 0 8px rgba(255, 165, 0, 0.55);
+  width: 50%;
+  font-size: 13px;
+  padding: 6px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.column-pause-btn.paused:not(:disabled):hover {
+  background: #b33;
+  border-color: #ff6666;
+  box-shadow: 0 0 6px rgba(180, 50, 50, 0.6);
+}
+
+/*  Pause rack confirm dialog  */
+#pause-rack-dialog {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#pause-rack-dialog.hidden {
+  display: none;
+}
+
+#pause-rack-dialog-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 32px;
+  min-width: 280px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+#pause-rack-dialog-msg {
+  margin: 0 0 20px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+#pause-rack-dialog-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+#pause-rack-confirm {
+  padding: 8px 20px;
+  background: #b33;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#pause-rack-confirm:hover {
+  background: #d44;
+}
+
+#pause-rack-cancel {
+  padding: 8px 20px;
+  background: var(--header-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ============================================================
+   GRID
+   ============================================================ */
+/*
+   #grid-wrapper {
+  overflow: visible;
+  width: fit-content;
+  margin-top: var(--grid-margin-top);
+}
+*/
+/*
+#grid-wrapper {
+  position: absolute;
+  top: var(--grid-margin-top);
+  left: 0;
+  right: 0;
+  bottom: 120px;
+  overflow: hidden; 
+}
+*/
+
+#grid-wrapper {
+  width: fit-content;
+  margin-top: var(--grid-margin-top);
+
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  overflow: visible;
+}
+
+/* In fit-all mode the transform handles sizing — clip to viewport so
+   the natural 3072px layout width can't cause horizontal overflow. */
+body.zoom-fit #grid-wrapper {
+  width: 100vw;
+  max-width: 100vw;
+}
+
+/* Column headers and grid live inside #kiosk-fx-wrap (which sits inside
+   #kiosk-anim-wrap). The wrapper's margin-top handles page positioning, so the
+   children need no large top margins of their own. */
+#kiosk-fx-wrap > .column-headers {
+  margin-top: 0;
+  transform-origin: top left;
+}
+#kiosk-fx-wrap > .grid {
+  margin-top: 4px;
+  transform-origin: top left;
+}
+
+.grid {
+  margin-top: 0; /*var(--grid-margin-top, 220px);*/
+  display: grid;
+  grid-template-columns: repeat(13, var(--card-size));
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+  overflow: visible !important;
+}
+
+html {
+  height: 100%;
+  margin: 0;
+  /* Viewport scrolls naturally — scrollbar is hidden visually */
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  /* No overflow set; body grows with content and lets html scroll it */
+}
+
+/* kiosk and zoom-fit use transforms — lock scroll on both axes */
+body.kiosk-mode,
+body.zoom-fit {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ============================================================
+   CARD
+   ============================================================ */
+.card {
+  width: var(--card-size);
+  min-width: var(--card-size);
+  max-width: var(--card-size);
+  flex: 0 0 var(--card-size);
+
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+
+  padding: 8px;
+  box-sizing: border-box;
+  color: var(--text);
+
+  position: relative;
+  overflow: visible !important;
+  z-index: 1;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Top-3 issue cards in full grid view */
+.card.top-issue-card {
+  background: rgba(20, 184, 166, 0.22) !important;
+  border: 2px solid rgba(20, 184, 166, 0.85) !important;
+}
+:root.dark .card.top-issue-card {
+  background: rgba(20, 184, 166, 0.28) !important;
+  border: 2px solid rgba(20, 184, 166, 0.9) !important;
+}
+
+body.zoom-fit .card:hover {
+  transform: scale(1.6);
+  transition:
+    transform 0.2s ease 1s,
+    box-shadow 0.2s ease 2s;
+  z-index: 1000;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.card-header {
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.card-header-text {
+  background: var(--header-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.card:not(.no-vessel) {
+  cursor: pointer;
+}
+
+.card.no-vessel {
+  opacity: 0.5;
+  filter: grayscale(0.6);
+}
+
+/* ============================================================
+   BUBBLES
+   ============================================================ */
+.bubbles {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  z-index: 200; /* above card header within the card's stacking context */
+}
+
+.bubble {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #000; /* stays readable in both themes */
+}
+
+.bubble.on {
+  background: #0f0;
+}
+.bubble.off {
+  background: #777;
+}
+.bubble.stopped {
+  background: #c00;
+  color: #fff;
+}
+.bubble.error {
+  background: #c00;
+  color: #fff;
+}
+
+.bubble.fault {
+  background: #ff8800;
+  color: #fff;
+}
+
+/* ============================================================
+   STATUS / PRESSURE / VALVE FAULT / SETPOINT REACHED INDICATORS
+     These are used both in the bubbles and inline in the telemetry rows, so they need to work in both contexts (circular bubble vs rectangular label)
+   ============================================================ */
+.pressure-high {
+  color: #c00;
+  font-weight: bold;
+}
+
+.pressure-alarm,
+.heater-low {
+  background: #ff0000;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 0.3px 3px;
+  display: inline-block;
+  border-radius: 3px;
+}
+
+.temp-setpoint-reached,
+.telemetry-sp.temp-setpoint-reached {
+  color: #0f0;
+  display: inline-block;
+}
+
+.temp-overshoot,
+.temp-thermal-runaway {
+  color: #ffffff;
+  font-weight: bold;
+  padding: 0.3px 3px;
+  display: inline-block;
+  border-radius: 3px;
+}
+
+.temp-overshoot {
+  background: #e07800;
+}
+
+.temp-thermal-runaway {
+  background: #ff0000;
+}
+
+.mixer-stopped {
+  color: #c00;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.declog-label-under {
+  position: absolute;
+  top: 32px;
+  right: 6px;
+  color: #d4aa00;
+  font-weight: bold;
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.status-valve-fault {
+  color: #ff8800; /* bright orange */
+  font-weight: bold;
+}
+
+.telemetry-reading.status-temp-span-mitg {
+  color: #ff8800;
+}
+
+.telemetry-reading.status-stopped {
+  color: #ff3333;
+  font-weight: bold;
+}
+
+/*expand/collapse probe values*/
+.t0-row,
+.t1-row,
+.t2-row {
+  display: none;
+}
+
+.t0-reading.pressure-alarm,
+.t1-reading.pressure-alarm,
+.t2-reading.pressure-alarm,
+.t0-reading.temp-span-alarm,
+.t1-reading.temp-span-alarm,
+.t2-reading.temp-span-alarm {
+  display: inline-block;
+}
+
+.temp-span-alarm {
+  background: #e07800;
+  color: #ffffff;
+  font-weight: bold;
+  padding: 0.3px 3px;
+  border-radius: 3px;
+}
+
+/* ============================================================
+   TELEMETRY
+   ============================================================ */
+.telemetry-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.telemetry-label {
+  min-width: 50px;
+  text-align: right;
+  margin-right: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #999;
+}
+
+.telemetry-reading {
+  flex: 1;
+  color: var(--text);
+}
+
+.telemetry-sp {
+  margin-left: auto;
+  text-align: right;
+  color: var(--text);
+  opacity: 0.75;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   POPUP - INDIVIDUAL SETPOINT MENU
+   ============================================================ */
+.sp-inline {
+  position: relative;
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+  color: #4aa3ff;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sp-inline:hover {
+  color: #82c4ff;
+}
+
+/* ============================================================
+   POPUP — combined setpoint menu
+   ============================================================ */
+#sp-popup {
+  position: fixed;
+  background: #fff;
+  color: #000;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #bbb;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
+  z-index: 2147483647;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 290px;
+  max-width: 360px;
+}
+
+/* Header row */
+.sp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.sp-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.sp-close {
+  cursor: pointer;
+  font-size: 16px;
+  color: #c00;
+  font-weight: bold;
+  padding: 2px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  line-height: 1;
+}
+.sp-close:hover {
+  color: #000;
+  background: #eee;
+}
+
+/* Section */
+.sp-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sp-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #555;
+}
+
+/* Button group (horizontal) */
+.sp-btn-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sp-btn {
+  flex: 1 1 auto;
+  padding: 6px 10px;
+  background: #e8e8e8;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+  text-align: center;
+  transition: background 0.1s;
+}
+.sp-btn:hover {
+  background: #d8d8d8;
+}
+
+.sp-btn--active {
+  background: #1a6b1a;
+  color: #fff;
+  border-color: #145014;
+}
+.sp-btn--active:hover {
+  background: #1e801e;
+}
+
+/* Custom temp value — wrapper centers the control in the button-group row */
+.sp-custom-temp-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.sp-custom-temp {
+  width: 64px;
+  padding: 6px 4px;
+  font-size: 14px;
+  border: 2px solid #1a6b1a;
+  border-radius: 4px;
+  background: #eaf5ea;
+  color: #000;
+  box-sizing: border-box;
+  text-align: center;
+  /* hide native browser spin buttons — we supply our own */
+  -moz-appearance: textfield;
+}
+.sp-custom-temp::-webkit-outer-spin-button,
+.sp-custom-temp::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+.sp-spin-btn {
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: bold;
+  line-height: 1;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  background: #f0f0f0;
+  cursor: pointer;
+  user-select: none;
+}
+.sp-spin-btn:hover {
+  background: #d8d8d8;
+}
+
+.dark .sp-custom-temp {
+  background: #1a3a1a;
+  color: #e0e0e0;
+  border-color: #2e8b2e;
+}
+.dark .sp-spin-btn {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+.dark .sp-spin-btn:hover {
+  background: #444;
+}
+
+/* Divider between sections */
+.sp-divider {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 0;
+}
+
+/* Last-set info below temp buttons */
+.sp-last-set-text {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+  padding-top: 2px;
+}
+
+/* Temp control OFF warning */
+.sp-temp-ctrl-off {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #b85000;
+  font-weight: 600;
+  background: #fff4e5;
+  border: 1px solid #f0b060;
+  border-radius: 4px;
+  padding: 4px 7px;
+}
+.sp-temp-ctrl-icon {
+  font-size: 14px;
+}
+.sp-hint {
+  font-size: 11px;
+  color: #666;
+  font-style: italic;
+  line-height: 1.4;
+}
+.sp-enable-ctrl-btn {
+  font-size: 12px;
+}
+
+/* Submit button */
+.sp-submit {
+  margin-top: 4px;
+  padding: 7px 14px;
+  background: #1a4fa8;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+.sp-submit:hover {
+  background: #1d5fc0;
+}
+
+/* ============================================================
+   TEMP HOVER TOOLTIP
+   ============================================================ */
+#temp-hover-tooltip {
+  position: fixed;
+  display: none;
+  background: #222;
+  color: #fff;
+  font-size: 11px;
+  padding: 5px 9px;
+  border-radius: 5px;
+  pointer-events: none;
+  z-index: 2147483646;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  line-height: 1.5;
+}
+
+/* Make .telemetry-sp on temp row look hoverable when it has data */
+.temp-sp[data-last-temp-value]:not([data-last-temp-value=""]) {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+/* ============================================================
+    BOTTOM PANEL + LEGEND
+      #bottom-panel is the fixed bottom container holding the fleet sparkline
+      strip and the legend. #legend-wrapper is static inside it.
+   ============================================================ */
+#bottom-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 99999;
+  background: var(--bg);
+}
+
+#legend-wrapper {
+  position: static;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+#legend {
+  padding: 8px 16px;
+  font-size: 16px;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-bubble {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.legend-bubble.on {
+  background: #0f0;
+}
+.legend-bubble.off {
+  background: #777;
+}
+.legend-bubble.stopped {
+  background: #c00;
+  color: #fff;
+}
+.legend-bubble.fault {
+  background: #ff8800;
+  color: #fff;
+}
+
+/* ============================================================
+   SLACK TICKET TICKER
+   Only shown in kiosk mode via the .kiosk-mode body class.
+   ============================================================ */
+#slack-ticker-wrapper {
+  display: none;
+  align-items: center;
+  gap: 14px;
+  height: 58px;
+  padding: 0 16px;
+  background: rgba(10, 10, 10, 0.88);
+  border-top: 1px solid rgba(255, 179, 0, 0.45);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#slack-ticker-badge {
+  color: #ffb300;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#slack-ticker-viewport {
+  flex: 1;
+  height: 52px;
+  overflow: hidden;
+  position: relative;
+}
+
+#slack-ticker-inner {
+  position: absolute;
+  width: 100%;
+  top: 0;
+  left: 0;
+}
+
+.slack-ticker-item {
+  min-height: 52px;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px 0;
+  box-sizing: border-box;
+}
+
+.slack-ticker-line1 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffb300;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.slack-ticker-line2 {
+  font-size: 13px;
+  color: #bbb;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+@keyframes slack-ticker-scroll {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.slack-ticker-none .slack-ticker-line1 {
+  color: #666;
+  font-weight: 400;
+}
+
+/* ============================================================
+   DEBUG OVERLAY
+   ============================================================ */
+#debug-overlay {
+  position: fixed !important;
+  pointer-events: auto !important;
+  background: rgba(0, 0, 0, 0.85) !important;
+  color: #0f0 !important;
+  padding: 0 !important;
+  font-family: monospace !important;
+  font-size: 13px !important;
+  transform: none !important;
+  border-radius: 4px !important;
+  border: 2px solid #f30505 !important;
+
+  z-index: 999999999 !important;
+  white-space: pre !important;
+
+  /* Resizing */
+  resize: both !important;
+  overflow: visible !important;
+
+  min-width: 220px;
+  min-height: 140px;
+  max-width: 90vw;
+  max-height: 90vh;
+
+  box-sizing: border-box;
+}
+
+#debug-overlay-header {
+  background: #333;
+  padding: 2px 6px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  font-size: 12px !important;
+  color: #0f0;
+  cursor: move;
+  user-select: none;
+  border-bottom: 1px solid #555;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Content area */
+#debug-content {
+  margin: 0 !important;
+  padding: 4px !important;
+  line-height: 1.1 !important;
+}
+
+/* TOP resize handle */
+#debug-overlay::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 0;
+  width: 100%;
+  height: 10px;
+  cursor: ns-resize;
+}
+
+/* LEFT resize handle */
+#debug-overlay::after {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.debug-row {
+  padding: 0 4px !important;
+  margin: 0 !important;
+  height: 16px !important;
+  line-height: 16px !important;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#debug-slot-input {
+  background: #222;
+  color: #0f0;
+  border: 1px solid #555;
+  font-family: monospace;
+  font-size: 13px;
+  padding: 0 3px !important;
+  height: 14px !important;
+  line-height: 14px !important;
+  margin: 0 !important;
+  width: 60px;
+}
+
+#debug-overlay.hidden {
+  display: none !important;
+}
+
+/* ============================================================
+   UNRACKED VESSELS STRIP
+   ============================================================ */
+#unracked-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  overflow-x: auto;
+  white-space: nowrap;
+  flex-shrink: 1;
+  min-width: 0;
+  margin-left: 100px;
+}
+
+#unracked-label {
+  font-weight: bold;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+#unracked-names {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.unracked-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: bold;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.unracked-card.vessel-highlight {
+  border-color: red;
+  border-width: 2px;
+}
+
+#debug-toggle {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  padding: 5px 10px;
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+#debug-toggle.active {
+  opacity: 1;
+  font-weight: bold;
+}
+
+#grid-reverse-toggle.active {
+  background: var(--accent, #00bcd4);
+  color: #fff;
+  border-color: var(--accent, #00bcd4);
+  font-weight: bold;
+}
+
+@keyframes grid-flip-horizontal {
+  0%   { transform: perspective(1200px) rotateY(0deg);    opacity: 1; }
+  45%  { transform: perspective(1200px) rotateY(90deg);   opacity: 0; }
+  55%  { transform: perspective(1200px) rotateY(-90deg);  opacity: 0; }
+  100% { transform: perspective(1200px) rotateY(0deg);    opacity: 1; }
+}
+
+#kiosk-anim-wrap.flip-animating {
+  animation: grid-flip-horizontal 0.55s ease-in-out forwards;
+}
+
+#kiosk-toggle {
+  opacity: 0.4;
+  transition: opacity 0.15s;
+  padding: 5px 10px;
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+#kiosk-toggle.active {
+  opacity: 0.4;
+}
+
+#debug-overlay::before,
+#debug-overlay::after {
+  pointer-events: none;
+}
+
+/* ============================================================
+   SETPOINT DISPLAY (inline next to live reading)
+   ============================================================ */
+.sp-display {
+  opacity: 0.55;
+  font-size: 12px;
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+  display: inline-block;
+}
+
+/* ============================================================
+   ISSUES-ONLY VIEW
+   ============================================================ */
+
+/* Toggle button */
+#issues-mode-toggle {
+  font-family: "Segoe UI Emoji", "Segoe UI", sans-serif !important;
+  background: none;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+#issues-mode-toggle.active,
+#issues-mode-toggle:active {
+  font-family: "Segoe UI Emoji", "Segoe UI", sans-serif !important;
+  background: #c00;
+  color: #fff;
+  border-color: #900;
+  font-weight: bold;
+}
+
+/* Filter bar — fixed strip that replaces column headers in issues mode */
+#issues-filter-bar {
+  position: fixed;
+  top: var(--col-headers-top, 230px);
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 100000;
+  box-sizing: border-box;
+}
+
+.issues-filter-label {
+  font-size: 18px;
+  font-weight: bold;
+  opacity: 1;
+  margin-right: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.issues-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 7px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.55;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.issues-chip-clear {
+  opacity: 0.4;
+  margin-left: 8px;
+  border-radius: 6px;
+}
+
+.issues-chip-clear:hover {
+  opacity: 0.75;
+}
+
+.issues-chip:hover {
+  opacity: 0.85;
+}
+
+.issues-chip.active {
+  opacity: 1;
+  background: var(--card-bg);
+  border-color: #888;
+}
+
+/* Issues mode: hide column headers, reflow grid to flex */
+body.issues-mode #column-headers {
+  display: none !important;
+}
+
+body.issues-mode #grid-wrapper {
+  width: auto;
+}
+
+body.issues-mode #grid {
+  display: flex !important;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  align-content: flex-start;
+  width: auto;
+  min-width: unset;
+  margin-top: var(--issues-filter-bar-height, 48px) !important;
+}
+
+/* Empty state */
+#issues-empty {
+  padding: 48px;
+  text-align: center;
+  font-size: 18px;
+  color: #999;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Card issues strip — hidden in normal mode, shown in issues mode - 
+chips area in each card */
+.card-issues-strip {
+  display: none;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 4px 2px 2px;
+}
+
+body.issues-mode .card-issues-strip {
+  display: flex;
+}
+
+/*individual chips */
+.issue-tag {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #555;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.issue-tag-motor {
+  background: #c00;
+}
+.issue-tag-temp {
+  background: #d4aa00;
+  color: #000;
+}
+.issue-tag-airflow {
+  background: #0077cc;
+}
+.issue-tag-pressure {
+  background: #ff8800;
+  color: #000;
+}
+.issue-tag-probe {
+  background: #9933cc;
+}
+
+/* Restart All Progress Bar — fixed full-width strip at top of viewport */
+#restart-progress {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 999999;
+  font-size: 13px;
+  font-family: monospace;
+  color: #90caf9;
+  background: #0d2137;
+  padding: 7px 12px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+}
+
+/* ============================================================
+   FLEET SPARKLINE STRIP
+   ============================================================ */
+#fleet-sparkline-strip {
+  height: 80px;
+  background: var(--bg);
+  /*border-top: 2px solid #2a3a5c;*/
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+#fleet-sparkline-handle {
+  height: 6px;
+  width: 100%;
+  cursor: default;
+  background: rgba(96, 165, 250, 0.18);
+  flex-shrink: 0;
+  transition: background 0.15s;
+  /*border-top: 1px solid var(--border);*/
+  box-sizing: border-box;
+}
+#fleet-sparkline-handle:hover {
+  /*background: rgba(96, 165, 250, 0.45);*/
+}
+
+#fleet-sparkline-inner {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+  padding: 4px 12px 4px 0;
+}
+
+#fleet-sparkline-label {
+  flex-shrink: 0;
+  width: 110px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 14px;
+  gap: 1px;
+}
+
+#fleet-sparkline-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  opacity: 0.9;
+}
+
+#fleet-sparkline-meta {
+  font-size: 10px;
+  color: var(--text);
+  opacity: 0.5;
+}
+
+#fleet-sparkline-avg {
+  font-size: 13px;
+  font-weight: 700;
+  color: #22c55e;
+}
+
+#fleet-sparkline-canvas {
+  flex: 1;
+  display: block;
+  border-radius: 3px;
+  background: transparent;
+}
+
+/* ============================================================
+   KIOSK MODE
+   ============================================================ */
+
+/* Kiosk issues title — fixed overlay shown only in kiosk + issues view */
+#kiosk-issues-title {
+  display: none;
+}
+body.ent-showing #kiosk-issues-title {
+  display: none !important;
+}
+
+body.kiosk-mode.issues-mode #kiosk-issues-title {
+  display: block;
+  position: fixed;
+  top: calc(var(--grid-margin-top, 339px) - 4px);
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family:
+    Avenir Light,
+    Avenir,
+    Nunito,
+    sans-serif;
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 100000;
+}
+
+/* Kiosk mode label — centred absolutely in the h1 flex row */
+#kiosk-mode-label {
+  display: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.65;
+  color: #f2e8d5;
+  pointer-events: none;
+  white-space: nowrap;
+}
+body.kiosk-mode #kiosk-mode-label {
+  display: block;
+}
+
+/* Hide cursor in kiosk mode; JS removes this class briefly on mouse movement */
+body.kiosk-cursor-hidden,
+body.kiosk-cursor-hidden * {
+  cursor: none !important;
+}
+
+/* Kiosk issues slide — wrapper must be full-viewport for the zoom transform */
+body.kiosk-mode.issues-mode #kiosk-anim-wrap,
+body.kiosk-mode.issues-mode #kiosk-fx-wrap {
+  width: 100vw;
+}
+
+/* Non-kiosk "Filter by Issues" view — same wrapper width + centred cards so
+   _kioskZoomToVisibleCards can auto-fit all visible cards to the viewport. */
+body.issues-mode:not(.kiosk-mode) #kiosk-anim-wrap {
+  width: 100vw;
+}
+
+body.issues-mode:not(.kiosk-mode) .grid {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fill, var(--card-size));
+  grid-template-rows: none;
+  width: 100vw;
+  max-width: 100vw;
+  min-width: unset;
+  justify-content: center;
+}
+
+/* Kiosk issues grid/card layout is set entirely via JS inline styles
+   so there is no CSS specificity battle with the base .grid rules. */
+
+/* #kiosk-anim-wrap owns the zoom transform (set by applyZoom / _kioskZoomToVisibleCards).
+   #kiosk-fx-wrap is the animation target — keeps transitions isolated from zoom. */
+
+#kiosk-anim-wrap {
+  width: max-content;
+}
+#kiosk-fx-wrap {
+  width: inherit;
+}
+
+/* Fade — opacity only, no transform */
+@keyframes kiosk-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes kiosk-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Blur */
+@keyframes kiosk-blur-out {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  to {
+    opacity: 0;
+    filter: blur(20px);
+  }
+}
+@keyframes kiosk-blur-in {
+  from {
+    opacity: 0;
+    filter: blur(20px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+/* Slides — percentage-based so they look right at any zoom level */
+@keyframes kiosk-slide-left-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-8%);
+  }
+}
+@keyframes kiosk-slide-left-in {
+  from {
+    opacity: 0;
+    transform: translateX(8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes kiosk-slide-right-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(8%);
+  }
+}
+@keyframes kiosk-slide-right-in {
+  from {
+    opacity: 0;
+    transform: translateX(-8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes kiosk-slide-up-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8%);
+  }
+}
+@keyframes kiosk-slide-up-in {
+  from {
+    opacity: 0;
+    transform: translateY(8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes kiosk-slide-down-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8%);
+  }
+}
+@keyframes kiosk-slide-down-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Wipes — clip-path, instant cut so no opacity flicker */
+@keyframes kiosk-wipe-left-out {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 100% 0 0);
+  }
+}
+@keyframes kiosk-wipe-left-in {
+  from {
+    clip-path: inset(0 0 0 100%);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kiosk-wipe-right-out {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+@keyframes kiosk-wipe-right-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kiosk-wipe-up-out {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 100% 0);
+  }
+}
+@keyframes kiosk-wipe-up-in {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes kiosk-wipe-down-out {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(100% 0 0 0);
+  }
+}
+@keyframes kiosk-wipe-down-in {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Iris */
+@keyframes kiosk-iris-out {
+  from {
+    clip-path: circle(150%);
+  }
+  to {
+    clip-path: circle(0%);
+  }
+}
+@keyframes kiosk-iris-in {
+  from {
+    clip-path: circle(0%);
+  }
+  to {
+    clip-path: circle(150%);
+  }
+}
+
+/* Diamond — polygon expanding from center point */
+@keyframes kiosk-diamond-out {
+  from {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  }
+  to {
+    clip-path: polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%);
+  }
+}
+@keyframes kiosk-diamond-in {
+  from {
+    clip-path: polygon(50% 50%, 50% 50%, 50% 50%, 50% 50%);
+  }
+  to {
+    clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+  }
+}
+
+/* Ripple — fast circle pulse, more energetic than iris */
+@keyframes kiosk-ripple-out {
+  0% {
+    clip-path: circle(100%);
+    opacity: 1;
+  }
+  60% {
+    clip-path: circle(20%);
+    opacity: 0.5;
+  }
+  100% {
+    clip-path: circle(0%);
+    opacity: 0;
+  }
+}
+@keyframes kiosk-ripple-in {
+  0% {
+    clip-path: circle(0%);
+    opacity: 0;
+  }
+  40% {
+    clip-path: circle(20%);
+    opacity: 0.5;
+  }
+  100% {
+    clip-path: circle(100%);
+    opacity: 1;
+  }
+}
+
+/* Glitch — rapid clip-path scanline jumps */
+@keyframes kiosk-glitch-out {
+  0% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+  15% {
+    clip-path: inset(20% 0 30% 0);
+    opacity: 0.9;
+  }
+  30% {
+    clip-path: inset(0 0 80% 0);
+    opacity: 0.8;
+  }
+  45% {
+    clip-path: inset(40% 0 20% 0);
+    opacity: 0.6;
+  }
+  60% {
+    clip-path: inset(10% 0 55% 0);
+    opacity: 0.4;
+  }
+  80% {
+    clip-path: inset(60% 0 5% 0);
+    opacity: 0.2;
+  }
+  100% {
+    clip-path: inset(50% 0 50% 0);
+    opacity: 0;
+  }
+}
+@keyframes kiosk-glitch-in {
+  0% {
+    clip-path: inset(50% 0 50% 0);
+    opacity: 0;
+  }
+  20% {
+    clip-path: inset(60% 0 5% 0);
+    opacity: 0.2;
+  }
+  40% {
+    clip-path: inset(10% 0 55% 0);
+    opacity: 0.4;
+  }
+  55% {
+    clip-path: inset(40% 0 20% 0);
+    opacity: 0.6;
+  }
+  70% {
+    clip-path: inset(0 0 80% 0);
+    opacity: 0.8;
+  }
+  85% {
+    clip-path: inset(20% 0 30% 0);
+    opacity: 0.9;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+/* Dissolve — blur out then focus in */
+@keyframes kiosk-dissolve-out {
+  from {
+    opacity: 1;
+    filter: blur(0px);
+  }
+  to {
+    opacity: 0;
+    filter: blur(16px);
+  }
+}
+@keyframes kiosk-dissolve-in {
+  from {
+    opacity: 0;
+    filter: blur(16px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0px);
+  }
+}
+
+/* Venetian — inset from top and bottom simultaneously */
+@keyframes kiosk-venetian-out {
+  from {
+    clip-path: inset(0 0 0 0);
+  }
+  to {
+    clip-path: inset(50% 0 50% 0);
+  }
+}
+@keyframes kiosk-venetian-in {
+  from {
+    clip-path: inset(50% 0 50% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Star wipe — 5-point star shrinking/expanding */
+@keyframes kiosk-star-out {
+  from {
+    clip-path: polygon(
+      50% 0%,
+      61% 35%,
+      98% 35%,
+      68% 57%,
+      79% 91%,
+      50% 70%,
+      21% 91%,
+      32% 57%,
+      2% 35%,
+      39% 35%
+    );
+  }
+  to {
+    clip-path: polygon(
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%
+    );
+  }
+}
+@keyframes kiosk-star-in {
+  from {
+    clip-path: polygon(
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%,
+      50% 50%
+    );
+  }
+  to {
+    clip-path: polygon(
+      50% 0%,
+      61% 35%,
+      98% 35%,
+      68% 57%,
+      79% 91%,
+      50% 70%,
+      21% 91%,
+      32% 57%,
+      2% 35%,
+      39% 35%
+    );
+  }
+}
+
+/* Spin — rotate + scale; safe because it targets #kiosk-fx-wrap, not #kiosk-anim-wrap */
+@keyframes kiosk-spin-out {
+  from {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(180deg) scale(0);
+    opacity: 0;
+  }
+}
+@keyframes kiosk-spin-in {
+  from {
+    transform: rotate(-180deg) scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Spiral — 1.5 turns + scale */
+@keyframes kiosk-spiral-out {
+  from {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(540deg) scale(0);
+    opacity: 0;
+  }
+}
+@keyframes kiosk-spiral-in {
+  from {
+    transform: rotate(-540deg) scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Zoom burst — scales dramatically away then punches in */
+@keyframes kiosk-zoom-burst-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+@keyframes kiosk-zoom-burst-in {
+  from {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   KIOSK ENTERTAINMENT PANEL
+   ============================================================ */
+
+#kiosk-ent-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 99992;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: min(16px, 2vh);
+  padding: min(48px, 5vh) min(100px, 7vw);
+  box-sizing: border-box;
+  font-family:
+    Avenir Light,
+    Avenir,
+    Nunito,
+    sans-serif;
+  color: #fff;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+  overflow: hidden;
+}
+#kiosk-ent-panel.ent-visible {
+  opacity: 1;
+}
+
+/*  Weather backgrounds  */
+#kiosk-ent-panel.ent-night {
+  background: linear-gradient(145deg, #0a0a1a 0%, #0f1b3d 45%, #1a1040 100%);
+}
+#kiosk-ent-panel.ent-sunny {
+  background: linear-gradient(145deg, #f7941d 0%, #fbbf24 35%, #e86500 100%);
+}
+#kiosk-ent-panel.ent-hot {
+  background: linear-gradient(145deg, #7f1d1d 0%, #dc2626 45%, #f97316 100%);
+}
+#kiosk-ent-panel.ent-partly {
+  background: linear-gradient(145deg, #1d4ed8 0%, #60a5fa 50%, #f59e0b 100%);
+}
+#kiosk-ent-panel.ent-cloudy {
+  background: linear-gradient(145deg, #374151 0%, #6b7280 50%, #9ca3af 100%);
+}
+#kiosk-ent-panel.ent-rain {
+  background: linear-gradient(145deg, #0c1445 0%, #1e3a8a 55%, #1e40af 100%);
+}
+#kiosk-ent-panel.ent-storm {
+  background: linear-gradient(145deg, #030712 0%, #1e1b4b 50%, #312e81 100%);
+}
+#kiosk-ent-panel.ent-fog {
+  background: linear-gradient(145deg, #475569 0%, #94a3b8 60%, #cbd5e1 100%);
+  color: #1e293b;
+}
+#kiosk-ent-panel.ent-snow {
+  background: linear-gradient(145deg, #0f2a5e 0%, #3b82f6 60%, #bfdbfe 100%);
+}
+
+/*  Entertainment type backgrounds  */
+#kiosk-ent-panel.ent-trivia {
+  background: linear-gradient(145deg, #020617 0%, #0f172a 40%, #1e1b4b 100%);
+}
+#kiosk-ent-panel.ent-joke {
+  background: linear-gradient(145deg, #2e1065 0%, #4c1d95 45%, #065f46 100%);
+}
+#kiosk-ent-panel.ent-funeral {
+  background: linear-gradient(
+    145deg,
+    #0c0c0c 0%,
+    #1a1a2e 40%,
+    #16213e 70%,
+    #1f2937 100%
+  );
+}
+#kiosk-ent-panel.ent-nor-news {
+  background: linear-gradient(
+    145deg,
+    #052e16 0%,
+    #14532d 40%,
+    #166534 70%,
+    #15803d 100%
+  );
+}
+#kiosk-ent-panel.ent-x-posts {
+  background: linear-gradient(145deg, #000000 0%, #0a0f14 40%, #15202b 100%);
+}
+.ent-x-posts .ent-bg-deco {
+  background:
+    radial-gradient(
+      ellipse 50% 45% at 88% 10%,
+      rgba(29, 155, 240, 0.1) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 35% 35% at 12% 88%,
+      rgba(29, 155, 240, 0.07) 0%,
+      transparent 70%
+    );
+}
+.ent-x-icon {
+  font-family: "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+  color: #fff;
+}
+.ent-tweet-card {
+  background: #15202b;
+  border: 1px solid #2f3f4f;
+  border-radius: 20px;
+  padding: 28px 32px;
+  max-width: 700px;
+  width: calc(100% - 40px);
+  color: #e7e9ea;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  text-align: left;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100vh - 2 * min(48px, 5vh) - 20px);
+}
+
+/* At 50% browser zoom the kiosk renders at half size — zoom:2 restores it to full size.
+   The max-height halves too (100vh = actual-viewport/0.5), so we scale the constraint back. */
+body.kiosk-mode .ent-tweet-card {
+  zoom: 2;
+  max-height: calc(50vh - min(48px, 5vh) - 10px);
+}
+.ent-tweet-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.ent-tweet-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.ent-tweet-avatar-placeholder {
+  background: #38444d;
+}
+.ent-tweet-byline {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.ent-tweet-name {
+  font-weight: 700;
+  font-size: 20px;
+  color: #e7e9ea;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ent-tweet-handle {
+  font-size: 17px;
+  color: #71767b;
+}
+.ent-tweet-x-logo {
+  font-size: 26px;
+  color: #e7e9ea;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.ent-tweet-text {
+  font-size: 26px;
+  line-height: 1.55;
+  color: #e7e9ea;
+  margin: 0 0 18px;
+  word-break: break-word;
+}
+.ent-tweet-images {
+  display: grid;
+  gap: 3px;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+.ent-tweet-img-1 { grid-template-columns: 1fr; }
+.ent-tweet-img-2,
+.ent-tweet-img-4 { grid-template-columns: 1fr 1fr; }
+.ent-tweet-img-3 { grid-template-columns: 1fr 1fr; }
+.ent-tweet-img-3 img:first-child { grid-column: 1 / -1; }
+.ent-tweet-images img {
+  width: 100%;
+  height: 260px;
+  max-height: min(260px, 30vh);
+  object-fit: cover;
+}
+.ent-tweet-date {
+  font-size: 15px;
+  color: #71767b;
+}
+
+/*  Scalable content wrapper — JS measures this and shrinks it to fit  */
+.ent-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+}
+
+/*  Background decorative layer  */
+.ent-bg-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Sunny / Hot: glowing orb top-right */
+.ent-sunny .ent-bg-deco,
+.ent-hot .ent-bg-deco {
+  background:
+    radial-gradient(
+      ellipse 60% 55% at 88% 12%,
+      rgba(255, 240, 180, 0.35) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 10% 90%,
+      rgba(255, 100, 0, 0.2) 0%,
+      transparent 60%
+    );
+  animation: ent-orb-pulse 4s ease-in-out infinite;
+}
+
+/* Rain: animated diagonal streaks */
+.ent-rain .ent-bg-deco,
+.ent-storm .ent-bg-deco {
+  background-image: repeating-linear-gradient(
+    174deg,
+    transparent 0px,
+    transparent 6px,
+    rgba(255, 255, 255, 0.035) 6px,
+    rgba(255, 255, 255, 0.035) 7px
+  );
+  background-size: 8px 40px;
+  animation: ent-rain-streak 0.55s linear infinite;
+}
+
+/* Storm: lightning flash overlay */
+.ent-storm .ent-bg-deco::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at 60% 5%,
+    rgba(180, 210, 255, 0.12) 0%,
+    transparent 55%
+  );
+  animation: ent-lightning 6s ease-in-out infinite;
+}
+
+/* Fog: layered mist bands */
+.ent-fog .ent-bg-deco {
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0%, transparent 30%),
+    linear-gradient(0deg, rgba(255, 255, 255, 0.04) 50%, transparent 80%);
+  animation: ent-fog-drift 8s ease-in-out infinite alternate;
+}
+
+/* Trivia / snow: twinkling star-field */
+.ent-trivia .ent-bg-deco,
+.ent-snow .ent-bg-deco {
+  background-image:
+    radial-gradient(
+      1.5px 1.5px at 8% 18%,
+      rgba(255, 255, 255, 0.8),
+      transparent
+    ),
+    radial-gradient(1px 1px at 23% 8%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 42% 30%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 60% 12%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(
+      1.5px 1.5px at 75% 40%,
+      rgba(255, 255, 255, 0.8),
+      transparent
+    ),
+    radial-gradient(1px 1px at 88% 22%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(2px 2px at 15% 65%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 50% 72%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(
+      1.5px 1.5px at 82% 68%,
+      rgba(255, 255, 255, 0.7),
+      transparent
+    ),
+    radial-gradient(1px 1px at 33% 88%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(2px 2px at 68% 85%, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 92% 80%, rgba(255, 255, 255, 0.5), transparent);
+  animation: ent-stars-twinkle 3.5s ease-in-out infinite alternate;
+}
+
+/* Joke: confetti-like scattered circles */
+.ent-joke .ent-bg-deco {
+  background-image:
+    radial-gradient(8px 8px at 5% 20%, rgba(251, 191, 36, 0.25), transparent),
+    radial-gradient(5px 5px at 18% 70%, rgba(167, 139, 250, 0.3), transparent),
+    radial-gradient(10px 10px at 80% 15%, rgba(52, 211, 153, 0.2), transparent),
+    radial-gradient(6px 6px at 90% 75%, rgba(251, 191, 36, 0.2), transparent),
+    radial-gradient(7px 7px at 50% 90%, rgba(167, 139, 250, 0.25), transparent),
+    radial-gradient(4px 4px at 72% 50%, rgba(52, 211, 153, 0.3), transparent);
+  animation: ent-confetti-drift 6s ease-in-out infinite alternate;
+}
+
+/*  Decorative keyframes  */
+@keyframes ent-orb-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+@keyframes ent-rain-streak {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 12px 50px;
+  }
+}
+@keyframes ent-lightning {
+  0%,
+  95%,
+  100% {
+    opacity: 1;
+  }
+  96%,
+  98% {
+    opacity: 1.6;
+  }
+  97%,
+  99% {
+    opacity: 0.8;
+  }
+}
+@keyframes ent-fog-drift {
+  from {
+    transform: translateX(-8px);
+    opacity: 0.8;
+  }
+  to {
+    transform: translateX(8px);
+    opacity: 1;
+  }
+}
+@keyframes ent-stars-twinkle {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes ent-confetti-drift {
+  from {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  to {
+    transform: translateY(-12px);
+    opacity: 1;
+  }
+}
+
+/* ── Shared content layer (sits above .ent-bg-deco) ── */
+#kiosk-ent-panel > *:not(.ent-bg-deco) {
+  position: relative;
+  z-index: 1;
+}
+
+/*  Big floating icon  */
+.ent-big-icon {
+  font-size: clamp(48px, 11vh, 108px);
+  line-height: 1;
+  filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.4));
+  animation: ent-float 3.2s ease-in-out infinite;
+}
+@keyframes ent-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+/*  Weather layout  */
+.ent-temp {
+  font-size: clamp(56px, 14vh, 140px);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -6px;
+  text-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
+}
+.ent-temp-deg {
+  font-size: 52px;
+  font-weight: 300;
+  letter-spacing: 0;
+  vertical-align: super;
+  margin-top: 18px;
+  display: inline-block;
+}
+.ent-cond {
+  font-size: clamp(20px, 5vh, 46px);
+  font-weight: 200;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  opacity: 0.92;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.3);
+}
+.ent-weather-row {
+  display: flex;
+  gap: min(40px, 3vw);
+  font-size: clamp(12px, 2.2vh, 22px);
+  opacity: 0.72;
+  margin-top: 6px;
+}
+.ent-clock {
+  font-size: 22px;
+  font-weight: 300;
+  letter-spacing: 1px;
+  opacity: 0.85;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  margin-top: 14px;
+}
+.ent-weather-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 72px;
+}
+.ent-weather-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.ent-lv-sign-wrap {
+  width: 300px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 6px 20px rgba(0, 0, 0, 0.5));
+}
+.ent-lv-sign {
+  width: 100%;
+  display: block;
+}
+
+/*  Trivia layout  */
+.ent-badge {
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  opacity: 0.5;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 7px 20px;
+  backdrop-filter: blur(4px);
+}
+.ent-qtext {
+  font-size: clamp(16px, 4vh, 40px);
+  font-weight: 500;
+  max-width: 960px;
+  line-height: 1.45;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.5);
+}
+.ent-answer {
+  font-size: clamp(24px, 6vh, 60px);
+  font-weight: 700;
+  color: #fbbf24;
+  text-shadow:
+    0 0 50px rgba(251, 191, 36, 0.7),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 1.4s ease;
+  max-width: 960px;
+}
+.ent-answer.revealed {
+  opacity: 1;
+}
+.ent-hint {
+  font-size: 14px;
+  letter-spacing: 1px;
+  opacity: 0.35;
+  transition: opacity 0.6s;
+}
+.ent-hint.revealed {
+  opacity: 0;
+}
+
+/*  NOR news layout  */
+.ent-news-headline {
+  font-size: 38px;
+  font-weight: 600;
+  max-width: 980px;
+  line-height: 1.45;
+  text-align: center;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.5);
+}
+.ent-news-meta {
+  font-size: 18px;
+  opacity: 0.65;
+  letter-spacing: 1px;
+  margin-top: 8px;
+}
+.ent-news-age {
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.4;
+  margin-top: 6px;
+}
+
+/*  Joke layout  */
+.ent-joke-setup {
+  font-size: clamp(16px, 4vh, 40px);
+  font-weight: 400;
+  max-width: 960px;
+  line-height: 1.55;
+  text-shadow: 0 3px 16px rgba(0, 0, 0, 0.4);
+}
+.ent-punchline {
+  font-size: clamp(18px, 4.5vh, 46px);
+  font-weight: 700;
+  color: #fbbf24;
+  text-shadow:
+    0 0 50px rgba(251, 191, 36, 0.7),
+    0 4px 20px rgba(0, 0, 0, 0.4);
+  max-width: 960px;
+  line-height: 1.4;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+.ent-punchline.revealed {
+  opacity: 1;
+}
+
+/* ============================================================
+   WATCHDOG PANEL
+   ============================================================ */
+
+#watchdog-toggle {
+  background: none;
+  border: 0.5px solid var(--border);
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text);
+  opacity: 0.4;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s,
+    opacity 0.15s;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+#watchdog-toggle.wd-active {
+  background: #2ecc71;
+  border-color: #27ae60;
+  color: #fff;
+  font-weight: 600;
+  opacity: 1;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   UPTIME PROTOTYPE
+   Toggle off : set UPTIME_PROTO_ENABLED = false in dashboard.js
+   Remove all : delete this block + the two UPTIME PROTOTYPE blocks in dashboard.js
+   ════════════════════════════════════════════════════════════════════════════ */
+.uptime-proto {
+  position: absolute;
+  right: 30px;
+  top: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.card.no-vessel .uptime-proto {
+  display: none;
+}
+
+.uptime-proto-track {
+  fill: none;
+  stroke: rgba(128, 128, 128, 0.2);
+  stroke-width: 3.5;
+}
+
+.uptime-proto-arc {
+  fill: none;
+  stroke: #2ecc71;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.uptime-proto-num {
+  font-size: 9.5px;
+  font-weight: 700;
+  fill: var(--text);
+  font-family: inherit;
+}
+
+.uptime-proto-sym {
+  font-size: 7px;
+  font-weight: 600;
+  fill: var(--text);
+  opacity: 0.7;
+  font-family: inherit;
+}
+
+.uptime-proto-lbl {
+  font-size: 6.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #888;
+  text-transform: uppercase;
+}
+
+/* Compact (text-only) mode — probes collapsed, no room for the ring */
+.uptime-proto-compact {
+  display: none;
+}
+
+.uptime-proto.compact {
+  top: 42px;
+  right: 8px;
+  gap: 0;
+}
+
+.uptime-proto.compact svg,
+.uptime-proto.compact .uptime-proto-lbl {
+  display: none;
+}
+
+.uptime-proto.compact .uptime-proto-compact {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #2ecc71;
+  text-align: right;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.uptime-proto-compact-pct {
+  font-size: 7.5px;
+  opacity: 0.8;
+}
+/* ════════════════════════════════════════════════════════════════════════════
+   END UPTIME PROTOTYPE
+   ════════════════════════════════════════════════════════════════════════════ */

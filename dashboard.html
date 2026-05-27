@@ -1,0 +1,246 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="dashboard.css" />
+    <title>Earth Las Vegas: Operations Status Board</title>
+  </head>
+
+  <body>
+    <!-- RESTART ALL STATUS BANNER — fixed full-width strip at very top of viewport -->
+    <div id="restart-progress"></div>
+
+    <!-- TOP BAR -->
+    <div id="fixed-header">
+      <h1
+        style="
+          font-family:
+            Avenir Light,
+            Avenir,
+            Nunito,
+            sans-serif;
+          color: #f2e8d5 !important;
+          font-weight: normal;
+        "
+      >
+        <img
+          src="earthLogo.svg"
+          alt="Earth"
+          style="
+            height: 42px;
+            vertical-align: middle;
+            margin-right: 30px;
+            opacity: 1;
+          "
+        />
+        <span style="position: relative; top: 2px" ;
+          >Operations Status Console</span
+        >
+        <span id="kiosk-mode-label">📺 Kiosk Mode</span>
+        <span
+          style="
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-right: 4px;
+          "
+        >
+          <span
+            id="heartbeat"
+            style="
+              width: 18px;
+              height: 18px;
+              border-radius: 50%;
+              display: inline-block;
+              background: #700;
+            "
+          ></span>
+          <span id="last-updated" style="font-size: 14px">
+            Last update: —
+          </span>
+        </span>
+      </h1>
+
+      <div id="top-bar">
+        <span style="margin-left: 0">Show/Hide:</span>
+        <button class="col-toggle" data-target="mass-row">⚖️ Weight</button>
+        <button class="col-toggle" data-target="probes">🌡️ Probes</button>
+        <button class="col-toggle" data-target="mechstatus-row">
+          🛠️ Status
+        </button>
+        <button class="col-toggle" data-target="motor-row">📐 Angle</button>
+
+        <div class="vessel-search">
+          <input
+            type="text"
+            id="vessel-search-input"
+            placeholder="Find vessel"
+          />
+          <button id="vessel-search-reset">Clear</button>
+        </div>
+
+        <div id="rack-controls">
+          <button id="pause-all-racks" title="Pause All Racks">
+            ⏸️ Pause All
+          </button>
+          <button id="restart-all-racks" title="Restart All Racks">
+            🔄 Restart All
+          </button>
+          <button
+            id="stop-all-racks"
+            title="Stop Restart / Pause All"
+            style="display: none"
+          >
+            ⛔ Stop
+          </button>
+        </div>
+
+        <button
+          id="issues-mode-toggle"
+          title="Show only vessels with active issues"
+        >
+          ⚠️ Filter by Issues
+        </button>
+
+        <div id="header-right">
+          <button id="zoom-toggle">🔍+ Fit All</button>
+          <button
+            id="grid-reverse-toggle"
+            title="Reverse rack order (1 on right)"
+          >
+            ⇄ Flip Rack View
+          </button>
+          <button id="theme-toggle">🌙</button>
+        </div>
+      </div>
+      <!-- attention-list lives outside #top-bar so it remains visible in kiosk mode -->
+      <span id="attention-list" style="font-size: 14px"></span>
+    </div>
+    <div id="header-drag-handle"></div>
+
+    <!-- ISSUES FILTER BAR — fixed strip at col-header level, shown only in issues mode -->
+    <div id="issues-filter-bar" style="display: none">
+      <span class="issues-filter-label">Filter:</span>
+      <button class="issues-chip" data-filter="motor">🛠️ Motor</button>
+      <button class="issues-chip" data-filter="temp">🌡️ Temp</button>
+      <button class="issues-chip" data-filter="airflow">💨 Airflow</button>
+      <button class="issues-chip" data-filter="pressure">💥 Pressure</button>
+      <button class="issues-chip" data-filter="probe">🔬 Probe Δ</button>
+      <button class="issues-chip issues-chip-clear" id="issues-chip-clear">
+        ✕ Clear
+      </button>
+    </div>
+
+    <!-- DEBUG OVERLAY -->
+    <div id="debug-overlay" class="hidden">
+      <div id="debug-overlay-header">
+        Rack ID:
+        <input id="debug-slot-input" type="text" placeholder="ex. 001A" />
+      </div>
+      <pre id="debug-content">DEBUG ACTIVE — waiting for data…</pre>
+    </div>
+
+    <!-- GRID -->
+    <div id="grid-wrapper">
+      <div id="kiosk-anim-wrap">
+        <div id="issues-empty" style="display: none">✓ No active issues</div>
+        <div id="column-headers" class="column-headers"></div>
+        <div id="grid" class="grid"></div>
+      </div>
+    </div>
+
+    <!-- KIOSK ISSUES TITLE — after grid-wrapper so it paints on top of the transformed grid -->
+    <div id="kiosk-issues-title">Top 3 Issues:</div>
+
+    <!-- BOTTOM PANEL: fleet sparkline strip + legend -->
+    <div id="bottom-panel">
+      <!-- SLACK TICKET TICKER — kiosk-only, scrolls open tickets above sparkline -->
+      <div id="slack-ticker-wrapper">
+        <div id="slack-ticker-badge">● OPEN TICKETS</div>
+        <div id="slack-ticker-viewport">
+          <div id="slack-ticker-inner"></div>
+        </div>
+      </div>
+
+      <!-- FLEET SPARKLINE STRIP -->
+      <div id="fleet-sparkline-strip">
+        <div id="fleet-sparkline-handle" title="Drag to resize"></div>
+        <div id="fleet-sparkline-inner">
+          <div id="fleet-sparkline-label">
+            <div id="fleet-sparkline-title">Issues Trend</div>
+            <div id="fleet-sparkline-meta">30 min · 180 pts</div>
+            <div id="fleet-sparkline-avg">—</div>
+          </div>
+          <canvas id="fleet-sparkline-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- LEGEND -->
+      <div id="legend-wrapper">
+        <div id="legend">
+          <strong>Legend:</strong>
+
+          <span class="legend-item">
+            <span class="legend-bubble on"></span> Running
+          </span>
+
+          <span class="legend-item">
+            <span class="legend-bubble off"></span> Off
+          </span>
+
+          <span class="legend-item">
+            <span class="legend-bubble stopped"></span> Stopped unexpectedly
+          </span>
+
+          <span class="legend-item">
+            <span class="legend-bubble fault"></span>
+            Valve fault detected —
+            <a
+              style="color: #00bcd4"
+              href="https://atlas.earthfuneral.com/internal/hmi/vessels/"
+              target="_blank"
+            >
+              HMI v1
+            </a>
+          </span>
+
+          <!-- UNRACKED VESSELS STRIP -->
+          <div id="unracked-strip" style="display: none">
+            <span id="unracked-label">Out of rack:</span>
+            <span id="unracked-names"></span>
+          </div>
+
+          <!-- DEBUG BUTTON -->
+          <button id="debug-toggle" title="Show/Hide Debug">🐞 Debug</button>
+          <button id="kiosk-toggle" title="Enter/Exit Kiosk Mode">
+            📺 Kiosk
+          </button>
+          <button id="watchdog-toggle" title="Show/Hide Watchdog Panel">
+            🐶 Watchdog
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- /#bottom-panel -->
+
+    <!-- POPUP -->
+    <div id="sp-popup"></div>
+
+    <!-- PAUSE RACK CONFIRM DIALOG -->
+    <div id="pause-rack-dialog" class="hidden">
+      <div id="pause-rack-dialog-box">
+        <p id="pause-rack-dialog-msg"></p>
+        <div id="pause-rack-dialog-buttons">
+          <button id="pause-rack-confirm">Pause Rack</button>
+          <button id="pause-rack-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KIOSK ENTERTAINMENT PANEL — populated and shown by JS -->
+    <div id="kiosk-ent-panel"></div>
+
+    <script src="dashboard.js" defer></script>
+  </body>
+</html>

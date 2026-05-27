@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Dashboard",
+  "version": "3.1.0",
+
+  "action": {
+    "default_title": "Dashboard"
+  },
+
+  "options_page": "options.html",
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "permissions": ["tabs", "scripting", "storage", "alarms", "declarativeNetRequest"],
+
+  "host_permissions": [
+    "https://grafana.earthfuneral.tech/*",
+    "https://oauth2.googleapis.com/*",
+    "https://www.googleapis.com/*",
+    "https://sheets.googleapis.com/*",
+    "https://atlas.earthfuneral.com/*",
+    "https://fh.earthfuneral.com/*",
+    "https://api.open-meteo.com/*",
+    "https://news.google.com/*",
+    "https://opentdb.com/*",
+    "https://v2.jokeapi.dev/*",
+    "https://slack.com/*",
+    "https://xcancel.com/*",
+    "https://rss.xcancel.com/*",
+    "https://x.com/*",
+    "https://twitter.com/*",
+    "https://publish.twitter.com/*",
+    "https://platform.twitter.com/*",
+    "https://lightbrd.com/*",
+    "https://nitter.space/*",
+    "https://nitter.privacydev.net/*",
+    "https://nitter.poast.org/*",
+    "https://nitter.cz/*",
+    "https://nitter.d420.de/*",
+    "https://twiiit.com/*",
+    "https://nitter.1d4.us/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["https://atlas.earthfuneral.com/internal/hmi/*"],
+      "js": ["ws-bridge.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": ["dashboard.html", "dashboard.js", "lv-sign.png", "tweet-sizer.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

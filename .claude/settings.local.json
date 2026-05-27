@@ -1,0 +1,69 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash \"C:/Users/Dean/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh\" --project-dir \"G:/Shared drives/Las Vegas Facility Operations/Maintenance/ChromeDashboardExtension\")",
+      "Bash(python -c \"import PIL; print\\('Pillow ok'\\)\")",
+      "Bash(pip show *)",
+      "Bash(python -c \"from PIL import Image; print\\('ok'\\)\")",
+      "Bash(pip install *)",
+      "Bash(python)",
+      "Bash(python -c \"import numpy; print\\('numpy ok'\\)\")",
+      "Bash(bash \"C:/Users/duchi/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh\" --project-dir \"H:/Shared drives/Las Vegas Facility Operations/Maintenance/ChromeDashboardExtension\")",
+      "Bash(grep -E \"\\\\.\\(js|json|html|md\\)$\")",
+      "Bash(claude plugins *)",
+      "Bash(go install *)",
+      "Bash(git clone *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\duchi\\\\cli-printing-press\")",
+      "Bash(Select-Object Name)",
+      "Bash(git config *)",
+      "Bash(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse)",
+      "Bash(Select-Object -First 50)",
+      "Bash(C:\\\\Users\\\\Dean\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\scripts\\\\start-server.sh --project-dir \"G:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\")",
+      "Bash(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(python \"C:\\\\Users\\\\duchi\\\\AppData\\\\Local\\\\Temp\\\\gen_dashboard_pdf.py\")",
+      "Bash(python -c ' *)",
+      "Bash(Get-ChildItem -Path \"G:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -File)",
+      "Bash(Select-Object FullName, Length)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -Include *.js, *.html, *.css, *.json)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse | Where-Object { $_.Extension -in @\\('.js', '.html', '.css', '.json'\\) } | Select-Object -ExpandProperty FullName)",
+      "Bash(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -Include \"*.js\")",
+      "PowerShell(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -Directory -ErrorAction SilentlyContinue | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "Bash(Get-ChildItem dashboard.html, dashboard.css, dashboard.js)",
+      "PowerShell(Invoke-WebRequest -Uri \"https://platform.twitter.com/widgets.js\" -OutFile \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\widgets.js\" -UserAgent \"Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/124.0.0.0 Safari/537.36\"; $f = Get-Item \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\widgets.js\"; \"Downloaded: $\\([math]::Round\\($f.Length/1KB, 1\\)\\) KB\")",
+      "Bash(Get-ChildItem -Path \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "PowerShell(\\(Get-Content \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\background.js\" | Measure-Object -Line\\).Lines; \\(Get-Content \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\dashboard.js\" | Measure-Object -Line\\).Lines; \\(Get-Content \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\widgets.js\" | Measure-Object -Line\\).Lines)",
+      "Bash(ls \"C:\\\\Users\\\\duchi\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\91750acb-3e0e-44db-a7ca-eb01470d09a4\\\\e34f71ac-8cb0-4163-a8bd-4d0f13e0d125\\\\skills\\\\docx\\\\scripts\\\\office\\\\\")",
+      "PowerShell(node --version)",
+      "PowerShell(npm list -g docx 2>$null)",
+      "PowerShell($env:NODE_PATH = \"C:\\\\Users\\\\duchi\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\"; cd \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\"; node --require \"C:\\\\Users\\\\duchi\\\\AppData\\\\Roaming\\\\npm\\\\node_modules\\\\docx\\\\build\\\\index.js\" generate-docs.js 2>&1 | head -5)",
+      "PowerShell($skillBase = \"C:\\\\Users\\\\duchi\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\91750acb-3e0e-44db-a7ca-eb01470d09a4\\\\e34f71ac-8cb0-4163-a8bd-4d0f13e0d125\\\\skills\\\\docx\"; python \"$skillBase\\\\scripts\\\\office\\\\validate.py\" \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\Dashboard_Extension_Reference.docx\" 2>&1)",
+      "PowerShell(Add-Type -Assembly 'System.IO.Compression.FileSystem'; $zip = [System.IO.Compression.ZipFile]::OpenRead\\(\"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\Dashboard_Extension_Reference.docx\"\\); $zip.Entries | Select-Object -ExpandProperty FullName; $zip.Dispose\\(\\))",
+      "Bash(Remove-Item \"H:\\\\Shared drives\\\\Las Vegas Facility Operations\\\\Maintenance\\\\ChromeDashboardExtension\\\\widgets.js\")",
+      "Skill(superpowers:brainstorming)",
+      "Skill(superpowers:brainstorming:*)",
+      "Skill(superpowers:writing-plans)",
+      "Skill(superpowers:writing-plans:*)",
+      "Skill(superpowers:subagent-driven-development)",
+      "Skill(superpowers:subagent-driven-development:*)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "enabledPlugins": {
+    "cli-printing-press@cli-printing-press": true
+  },
+  "extraKnownMarketplaces": {
+    "cli-printing-press": {
+      "source": {
+        "source": "directory",
+        "path": "H:/Shared drives/Las Vegas Facility Operations/Maintenance/ChromeDashboardExtension/cli-printing-press"
+      }
+    }
+  }
+}
