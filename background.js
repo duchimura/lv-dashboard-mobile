@@ -95,6 +95,19 @@ const RACK_RESET_COOLDOWN_MS  = 10 * 60_000; // 10 min between rack resets per s
 // does not mean the heater is off; it just means that frame didn't include it.
 const lastHeaterActiveSeen = {}; // slotName → Date.now() ms
 const HEATER_ACTIVE_GRACE_MS = 30000; // 30 s without heater_control_active:true → OFF
+
+// ── Mobile snapshot: motor angle tracking (mirrors dashboard.js logic) ───
+const _bgLastAngles       = new Map(); // slotName → last currentAngle
+const _bgMotorActiveUntil = new Map(); // slotName → ms timestamp
+const _bgMotorSteadyGreen = new Map(); // slotName → boolean
+// ─────────────────────────────────────────────────────────────────────────
+
+function _toF(c) {
+  return typeof c === "number" && !isNaN(c)
+    ? Math.round((c * 9 / 5 + 32) * 10) / 10
+    : null;
+}
+
 const injectedTabs = new Set();
 let lastWsMessage = Date.now();
 
@@ -274,6 +287,56 @@ chrome.tabs.onReplaced.addListener((addedTabId, removedTabId) => {
 });
 
 // HANDLE WS_DATA
+
+function _updateMotorTracking(slotName, currentAngle) {
+  if (isNaN(currentAngle)) return;
+  const prev = _bgLastAngles.get(slotName);
+  if (prev !== undefined && Math.abs(currentAngle - prev) > 10) {
+    _bgMotorActiveUntil.set(slotName, Date.now() + 30000);
+    _bgMotorSteadyGreen.set(slotName, true);
+  }
+  _bgLastAngles.set(slotName, currentAngle);
+}
+
+function _mBubble(slotName, v) {
+  const cmd = (v.mixerModuleStatus || "").toUpperCase();
+  const commandIsOn  = cmd === "MIXER_RUNNING" || cmd === "MIXER_MIXING" || cmd === "ON";
+  const commandIsOff = cmd === "OFF" || cmd === "MIXER_OFF";
+  const stoppedUnexpectedly = cmd === "MIXER_STOPPED";
+  const hasFault = v.valveModuleStatus === "VALVE_FAULT";
+  const ctrlInactive = (v.mechanicalStatus || "").toLowerCase().includes("ctrl_inactive");
+  const manuallyPaused = v.rackGroupPaused === true && v.row === 0;
+
+  if (_bgMotorSteadyGreen.get(slotName)) return "on";
+  if ((_bgMotorActiveUntil.get(slotName) || 0) > Date.now()) return "on";
+  if (commandIsOff) return "off";
+  if (stoppedUnexpectedly && hasFault) return "fault";
+  if (stoppedUnexpectedly && (ctrlInactive || manuallyPaused)) return "off";
+  if (stoppedUnexpectedly) return "stopped";
+  if (commandIsOn) return "on";
+  return "off";
+}
+
+function _tBubble(v) {
+  if (v.tempControlOn === true)  return "on";
+  if (v.tempControlOn === false) return "error";
+  return "off";
+}
+
+function _bBubble(slotName, v) {
+  const t = v.telemetry || {};
+  const declogActive   = v.intake_declog_req === 1 || v.exhaust_declog_req === 1;
+  const ctrlInactive   = (v.mechanicalStatus || "").toLowerCase().includes("ctrl_inactive");
+  const manuallyPaused = v.rackGroupPaused === true && v.row === 0;
+  if (declogActive || ctrlInactive || manuallyPaused) return "off";
+  const pressure    = Number(t.pressure ?? 0);
+  const rawBlowerOn = Number(t.airflow) > 0;
+  const blowerOn    = (v.lastAirflowPositiveAt && Date.now() - v.lastAirflowPositiveAt < 30000)
+                      || rawBlowerOn;
+  if (pressure > 9 && !rawBlowerOn) return "off";
+  return blowerOn ? "on" : "stopped";
+}
+
 function handleWsData(msg) {
   lastWsMessage = Date.now();
 
@@ -311,7 +374,10 @@ function handleWsData(msg) {
   if (typeof d.temp_1 === "number") t.temp1 = d.temp_1;
   if (typeof d.temp_2 === "number") t.temp2 = d.temp_2;
   if (typeof d.mass === "number") t.mass = d.mass;
-  if (typeof d.current_angle === "number") t.currentAngle = d.current_angle;
+  if (typeof d.current_angle === "number") {
+    t.currentAngle = d.current_angle;
+    _updateMotorTracking(v.slotName, d.current_angle);
+  }
   if (typeof d.airflow === "number") {
     t.airflow = d.airflow;
     if (d.airflow > 0) v.lastAirflowPositiveAt = Date.now();
