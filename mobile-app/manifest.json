@@ -1,0 +1,18 @@
+{
+  "name": "Operations Status",
+  "short_name": "Ops Status",
+  "description": "Las Vegas facility operations — live vessel status",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f3460",
+  "background_color": "#0d0d0d",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
