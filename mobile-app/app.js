@@ -171,10 +171,12 @@ function openDetail(v) {
   document.getElementById("detail-pressure").textContent = fmt(v.pressure, "kPa");
 
   const issuesEl = document.getElementById("detail-issues");
-  if (v.issues.length) {
-    issuesEl.textContent = `⚠ Active issues: ${v.issues.join(" · ")}`;
+  const issues = Array.isArray(v.issues) ? v.issues : [];
+  if (issues.length) {
+    issuesEl.textContent = `⚠ Active issues: ${issues.join(" · ")}`;
     issuesEl.classList.add("has-issues");
   } else {
+    issuesEl.textContent = "";
     issuesEl.classList.remove("has-issues");
   }
 
@@ -196,7 +198,7 @@ function render(data) {
   document.getElementById("status-message").classList.remove("visible");
   document.getElementById("grid").style.display = "";
   document.getElementById("fleet-summary").style.display = "";
-  renderFleet(data.fleet);
+  if (data.fleet) renderFleet(data.fleet);
   renderGrid(data);
   checkStale(data.updated);
 }
@@ -220,6 +222,13 @@ async function tick() {
 
 /* ── Init ────────────────────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
+  if (!VESSEL_STATE_FILE_ID || VESSEL_STATE_FILE_ID === "PASTE_FILE_ID_HERE") {
+    const msg = document.getElementById("status-message");
+    msg.textContent = "Configuration needed: set VESSEL_STATE_FILE_ID in config.js";
+    msg.classList.add("visible");
+    return;
+  }
+
   document.getElementById("detail-back").addEventListener("click", closeDetail);
 
   const msg = document.getElementById("status-message");
