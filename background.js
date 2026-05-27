@@ -1,4 +1,4 @@
-import { readDriveState, writeDriveState, appendSetpointLogRows, appendMotorAuditRows, readUptimeState, writeUptimeState } from "./drive-sync.js";
+import { readDriveState, writeDriveState, appendSetpointLogRows, appendMotorAuditRows, readUptimeState, writeUptimeState, writeVesselState } from "./drive-sync.js";
 
 // date+time stamp for every console.log post
 function _log(...args) {
@@ -106,6 +106,88 @@ function _toF(c) {
   return typeof c === "number" && !isNaN(c)
     ? Math.round((c * 9 / 5 + 32) * 10) / 10
     : null;
+}
+
+let _lastMobileSnapshotAt = 0;
+const MOBILE_SNAPSHOT_MS  = 15_000;
+
+async function _buildMobilePayload() {
+  const { watchdog_state } = await new Promise(r =>
+    chrome.storage.local.get("watchdog_state", r)
+  );
+  const watchdogEnabled = !!watchdog_state?.enabled;
+
+  let running = 0, off = 0, stopped = 0, fault = 0, issues = 0;
+  const vessels = [];
+
+  for (const [slotName, v] of Object.entries(dashboardState)) {
+    if (!v.vesselPresent) continue;
+
+    const t   = v.telemetry || {};
+    const mB  = _mBubble(slotName, v);
+    const tB  = _tBubble(v);
+    const bB  = _bBubble(slotName, v);
+
+    const issueList = [];
+    if (mB === "stopped" || mB === "fault") issueList.push("motor");
+    if (tB === "error")                     issueList.push("temp");
+    if (bB === "stopped")                   issueList.push("airflow");
+    if (Number(t.pressure ?? 0) > 9)        issueList.push("pressure");
+
+    const vesselStatus =
+      mB === "fault"   ? "fault"   :
+      mB === "stopped" ? "stopped" :
+      mB === "on"      ? "running" : "off";
+
+    if (vesselStatus === "running")      running++;
+    else if (vesselStatus === "stopped") stopped++;
+    else if (vesselStatus === "fault")   fault++;
+    else                                 off++;
+    if (issueList.length) issues++;
+
+    const probes = [_toF(Number(t.temp0)), _toF(Number(t.temp1)), _toF(Number(t.temp2))]
+      .filter(x => x !== null);
+    const avgTemp = probes.length
+      ? Math.round(probes.reduce((a, b) => a + b, 0) / probes.length * 10) / 10
+      : null;
+
+    vessels.push({
+      id:      slotName,
+      rack:    parseInt(slotName.slice(0, 3), 10),
+      slot:    slotName.slice(3),
+      status:  vesselStatus,
+      mBubble: mB,
+      tBubble: tB,
+      bBubble: bB,
+      temp:     avgTemp,
+      airflow:  typeof t.airflow   === "number" ? Math.round(t.airflow   * 10) / 10 : null,
+      pressure: typeof t.pressure  === "number" ? Math.round(t.pressure  * 100) / 100 : null,
+      issues:  issueList,
+      paused:  v.rackGroupPaused === true,
+    });
+  }
+
+  return {
+    updated: new Date().toISOString(),
+    fleet:   { running, off, stopped, fault, issues },
+    vessels,
+    watchdog: { enabled: watchdogEnabled },
+  };
+}
+
+async function _writeMobileSnapshot() {
+  try {
+    const payload = await _buildMobilePayload();
+    await writeVesselState(payload);
+  } catch (e) {
+    _log("⚠️ [MOBILE] snapshot write failed:", e.message);
+  }
+}
+
+function _scheduleMobileSnapshot() {
+  if (Date.now() - _lastMobileSnapshotAt < MOBILE_SNAPSHOT_MS) return;
+  _lastMobileSnapshotAt = Date.now();
+  _writeMobileSnapshot();
 }
 
 const injectedTabs = new Set();
@@ -434,6 +516,7 @@ function handleWsData(msg) {
   // ════════════════════════════════════════════════════════════════════
 
   safeSend({ type: "dashboard:update", slotName: v.slotName, vessel: v });
+  _scheduleMobileSnapshot();
 }
 
 // MESSAGE HANDLER (CLEAN + DIRECT WS CONTROL)
@@ -3246,7 +3329,10 @@ chrome.alarms.get("watchdogDriveSync", (existing) => {
 });
 chrome.alarms.onAlarm.addListener(alarm => {
   // _machineId is always set before any alarm fires (alarms fire ≥1 min after SW start)
-  if (alarm.name === "watchdogDriveSync") _drivePoll();
+  if (alarm.name === "watchdogDriveSync") {
+    _drivePoll();
+    _scheduleMobileSnapshot();
+  }
 });
 
 // React instantly when any dashboard tab writes a new watchdog state.
