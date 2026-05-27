@@ -1,0 +1,22 @@
+name: Deploy mobile-app to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+    paths: [mobile-app/**]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy mobile-app subfolder to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./mobile-app
+          publish_branch: gh-pages
