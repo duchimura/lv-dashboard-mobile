@@ -486,6 +486,19 @@ function handleWsData(msg) {
       .trim();
   }
 
+  // Clear motor steady-green latch when status confirms motor is off/faulted
+  const _mixerUpper = (v.mixerModuleStatus || "").toUpperCase();
+  const _motorKnownOff =
+    _mixerUpper === "OFF" ||
+    _mixerUpper === "MIXER_OFF" ||
+    _mixerUpper === "POWER_INACTIVE" ||
+    _mixerUpper === "MIXER_STOPPED" ||
+    _mixerUpper.includes("FAULTED");
+  if (_motorKnownOff) {
+    _bgMotorSteadyGreen.set(v.slotName, false);
+    _bgMotorActiveUntil.set(v.slotName, 0);
+  }
+
   // TEMP CONTROL STATE (authoritative from WS telemetry)
   // Rules:
   // - heater_control_active: true → ON
