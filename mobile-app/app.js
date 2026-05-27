@@ -1,7 +1,7 @@
 const FETCH_INTERVAL_MS = 15_000;
 const STALE_MS          = 2 * 60_000;
 const DRIVE_URL = () =>
-  `https://drive.google.com/uc?export=download&id=${VESSEL_STATE_FILE_ID}&ts=${Date.now()}`;
+  `https://www.googleapis.com/drive/v3/files/${VESSEL_STATE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}&ts=${Date.now()}`;
 
 let _currentData = null;
 
