@@ -403,6 +403,42 @@ export async function writeDriveState(state) {
 const UPTIME_FILE_NAME = "uptime_sync.json";
 let _uptimeFileId = null;
 
+/* ── Mobile app vessel state (vessel_state.json) ───────────────────────── */
+const VESSEL_STATE_FILE_NAME = "vessel_state.json";
+let _vesselStateFileId = null;
+
+async function _getVesselStateFileId() {
+  if (_vesselStateFileId) return _vesselStateFileId;
+  const tok = await _getToken();
+  const q = encodeURIComponent(
+    `name='${VESSEL_STATE_FILE_NAME}' and '${FOLDER_ID}' in parents and trashed=false`
+  );
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)&supportsAllDrives=true&includeItemsFromAllDrives=true`,
+    { headers: { Authorization: `Bearer ${tok}` } }
+  );
+  if (!res.ok) throw new Error(`vessel state list ${res.status}`);
+  const j = await res.json();
+  if (j.files?.length) { _vesselStateFileId = j.files[0].id; return _vesselStateFileId; }
+  const boundary = "vessel_state_mp";
+  const mp = [
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
+      JSON.stringify({ name: VESSEL_STATE_FILE_NAME, parents: [FOLDER_ID] }),
+    `--${boundary}\r\nContent-Type: application/json\r\n\r\n{}`,
+    `--${boundary}--`,
+  ].join("\r\n");
+  const cr = await fetch(
+    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true",
+    { method: "POST",
+      headers: { Authorization: `Bearer ${tok}`,
+                 "Content-Type": `multipart/related; boundary=${boundary}` },
+      body: mp }
+  );
+  if (!cr.ok) throw new Error(`vessel state create ${cr.status}`);
+  _vesselStateFileId = (await cr.json()).id;
+  return _vesselStateFileId;
+}
+
 async function _getUptimeFileId() {
   if (_uptimeFileId) return _uptimeFileId;
   const tok = await _getToken();
@@ -457,4 +493,16 @@ export async function writeUptimeState(state) {
       body: JSON.stringify(state) }
   );
   if (!res.ok) throw new Error(`uptime write ${res.status}`);
+}
+
+export async function writeVesselState(payload) {
+  const tok = await _getToken();
+  const id  = await _getVesselStateFileId();
+  const res = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media&supportsAllDrives=true`,
+    { method: "PATCH",
+      headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload) }
+  );
+  if (!res.ok) throw new Error(`vessel state write ${res.status}`);
 }
