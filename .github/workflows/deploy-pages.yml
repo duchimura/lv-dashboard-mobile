@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
     paths: [mobile-app/**]
+  workflow_dispatch:
 
 permissions:
   contents: write
