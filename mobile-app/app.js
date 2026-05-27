@@ -57,7 +57,7 @@ function fmt(v, unit) {
 function renderGrid(data) {
   const grid = document.getElementById("grid");
   const byRack = new Map();
-  for (const v of data.vessels) {
+  for (const v of (data.vessels ?? [])) {
     if (!byRack.has(v.rack)) byRack.set(v.rack, []);
     byRack.get(v.rack).push(v);
   }
