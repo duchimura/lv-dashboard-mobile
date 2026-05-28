@@ -182,9 +182,13 @@ async function _buildMobilePayload() {
       airflow:    typeof t.airflow      === "number" ? Math.round(t.airflow      * 10)  / 10  : null,
       pressure:   typeof t.pressure     === "number" ? Math.round(t.pressure     * 100) / 100 : null,
       motorAngle: typeof t.currentAngle === "number" ? Math.round(t.currentAngle * 10)  / 10  : null,
-      mass:       _toLbs(t.mass),
-      issues:     issueList,
-      paused:     v.rackGroupPaused === true,
+      mass:            _toLbs(t.mass),
+      motorStatus:     v.mixerModuleStatus  || null,
+      mechStatus:      v.mechanicalStatus   || null,
+      tempModStatus:   v.tempModuleStatus   || null,
+      uptimePct:       v.motorUptimePct     ?? null,
+      issues:          issueList,
+      paused:          v.rackGroupPaused === true,
     });
   }
 
