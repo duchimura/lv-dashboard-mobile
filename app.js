@@ -41,6 +41,7 @@ function makeBubble(letter, state) {
 
 /* ── Card border class ───────────────────────────────────────────────────── */
 function cardClass(vessel) {
+  if (vessel.status === "empty") return "vessel-card vessel-empty";
   if (vessel.mBubble === "fault") return "vessel-card issue-orange";
   if (vessel.mBubble === "stopped" || vessel.tBubble === "error" || vessel.bBubble === "stopped")
     return "vessel-card issue-red";
@@ -56,37 +57,31 @@ function fmt(v, unit) {
 /* ── Render grid ─────────────────────────────────────────────────────────── */
 function renderGrid(data) {
   const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
   const byRack = new Map();
   for (const v of (data.vessels ?? [])) {
     if (!byRack.has(v.rack)) byRack.set(v.rack, []);
     byRack.get(v.rack).push(v);
   }
 
-  const rackNums = [...byRack.keys()].sort((a, b) => a - b);
-  const existingRacks = new Map([...grid.querySelectorAll(".rack-section")]
-    .map(el => [parseInt(el.dataset.rack, 10), el]));
+  for (const rackNum of [...byRack.keys()].sort((a, b) => a - b)) {
+    const section = document.createElement("div");
+    section.className = "rack-section";
+    section.dataset.rack = rackNum;
 
-  for (const rackNum of rackNums) {
-    const vessels = byRack.get(rackNum).sort((a, b) => a.slot.localeCompare(b.slot));
-    let section = existingRacks.get(rackNum);
-    if (!section) {
-      section = document.createElement("div");
-      section.className = "rack-section";
-      section.dataset.rack = rackNum;
-      const label = document.createElement("div");
-      label.className = "rack-label";
-      label.textContent = `Rack ${rackNum}`;
-      section.appendChild(label);
-      const cards = document.createElement("div");
-      cards.className = "rack-cards";
-      section.appendChild(cards);
-      grid.appendChild(section);
-    }
-    const cardsEl = section.querySelector(".rack-cards");
-    cardsEl.innerHTML = "";
-    for (const v of vessels) {
+    const label = document.createElement("div");
+    label.className = "rack-label";
+    label.textContent = `Rack ${rackNum}`;
+    section.appendChild(label);
+
+    const cardsEl = document.createElement("div");
+    cardsEl.className = "rack-cards";
+    for (const v of byRack.get(rackNum).sort((a, b) => a.slot.localeCompare(b.slot))) {
       cardsEl.appendChild(makeCard(v));
     }
+    section.appendChild(cardsEl);
+    grid.appendChild(section);
   }
 }
 
@@ -94,11 +89,23 @@ function renderGrid(data) {
 function makeCard(v) {
   const card = document.createElement("div");
   card.className = cardClass(v);
-  card.addEventListener("click", () => openDetail(v));
 
   const id = document.createElement("div");
   id.className = "slot-id";
   id.textContent = v.id;
+  card.appendChild(id);
+
+  // Empty slot — just show the ID, no bubbles or telemetry
+  if (v.status === "empty") return card;
+
+  if (v.vesselName) {
+    const nameEl = document.createElement("div");
+    nameEl.className = "card-vessel-name";
+    nameEl.textContent = v.vesselName;
+    card.appendChild(nameEl);
+  }
+
+  card.addEventListener("click", () => openDetail(v));
 
   const bubblesRow = document.createElement("div");
   bubblesRow.className = "bubbles-row";
@@ -112,16 +119,17 @@ function makeCard(v) {
   if (v.status === "off") {
     telem.innerHTML = `<div class="dim">— °F</div><div class="dim">— l/m</div><div class="dim">— kPa</div>`;
   } else {
-    const tempClass = v.tBubble === "error" ? "warn" : "";
-    const flowClass = v.bBubble === "stopped" ? "err" : "";
+    const tempClass  = v.tBubble === "error" ? "warn" : "";
+    const flowClass  = v.bBubble === "stopped" ? "err" : "";
     const pressClass = (v.pressure !== null && v.pressure > 9) ? "err" : "";
+    const dayStr     = v.daysSince !== null ? `<div class="card-days">Day ${v.daysSince}</div>` : "";
     telem.innerHTML =
       `<div class="${tempClass}">${fmt(v.temp, "°F")}</div>` +
       `<div class="${flowClass}">${fmt(v.airflow, "l/m")}</div>` +
-      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>`;
+      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>` +
+      dayStr;
   }
 
-  card.appendChild(id);
   card.appendChild(bubblesRow);
   card.appendChild(telem);
   return card;
@@ -137,7 +145,8 @@ function renderFleet(fleet) {
 
 /* ── Detail view ─────────────────────────────────────────────────────────── */
 function openDetail(v) {
-  document.getElementById("detail-title").textContent = `Vessel ${v.id}`;
+  document.getElementById("detail-title").textContent =
+    v.vesselName ? `${v.id} · ${v.vesselName}` : `Vessel ${v.id}`;
   const badge = document.getElementById("detail-status-badge");
   badge.textContent = v.status.toUpperCase();
   badge.className = `detail-status-badge ${v.status}`;
@@ -166,9 +175,27 @@ function openDetail(v) {
     bubblesEl.appendChild(cell);
   }
 
-  document.getElementById("detail-temp").textContent     = fmt(v.temp, "°F");
-  document.getElementById("detail-airflow").textContent  = fmt(v.airflow, "l/m");
-  document.getElementById("detail-pressure").textContent = fmt(v.pressure, "kPa");
+  // Temperature section
+  document.getElementById("detail-temp").textContent        = fmt(v.temp, "°F");
+  document.getElementById("detail-heater").textContent      = fmt(v.heaterTemp, "°F");
+  const probes = Array.isArray(v.probes) ? v.probes : [null, null, null];
+  document.getElementById("detail-probe1").textContent      = fmt(probes[0], "°F");
+  document.getElementById("detail-probe2").textContent      = fmt(probes[1], "°F");
+  document.getElementById("detail-probe3").textContent      = fmt(probes[2], "°F");
+  // Airflow & pressure
+  document.getElementById("detail-airflow").textContent     = fmt(v.airflow, "l/m");
+  document.getElementById("detail-pressure").textContent    = fmt(v.pressure, "kPa");
+  // Mechanical
+  document.getElementById("detail-angle").textContent       = fmt(v.motorAngle, "°");
+  document.getElementById("detail-mass").textContent        = fmt(v.mass, "lbs");
+  // Status strings
+  document.getElementById("detail-motor-status").textContent  = v.motorStatus   || "—";
+  document.getElementById("detail-mech-status").textContent   = v.mechStatus    || "—";
+  document.getElementById("detail-temp-status").textContent   = v.tempModStatus || "—";
+  // Uptime
+  const uptimeEl = document.getElementById("detail-uptime");
+  uptimeEl.textContent = v.uptimePct !== null && v.uptimePct !== undefined
+    ? `${v.uptimePct.toFixed(1)} %` : "—";
 
   const issuesEl = document.getElementById("detail-issues");
   const issues = Array.isArray(v.issues) ? v.issues : [];

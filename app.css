@@ -19,8 +19,10 @@ body {
   top: 0;
   z-index: 10;
 }
+#header-title { display: flex; flex-direction: column; }
 #header h1 { font-size: 15px; font-weight: bold; color: #f2e8d5; }
-#live-indicator { font-size: 11px; color: #0f0; }
+#header-sub { font-size: 9px; color: #6a8aaf; margin-top: 1px; }
+#live-indicator { font-size: 11px; color: #0f0; white-space: nowrap; }
 #live-indicator.stale { color: #ff9800; }
 
 /* ── Stale banner ────────────────────────────────────────────────────────── */
@@ -89,8 +91,12 @@ body {
 .vessel-card.issue-red    { background: #3a1e1e; border-color: #c00; }
 .vessel-card.issue-orange { background: #2a2a1e; border-color: #ff8800; }
 .vessel-card.vessel-off   { background: #1a1a1a; border-color: #2a2a2a; opacity: 0.5; }
+.vessel-card.vessel-empty { background: #161616; border: 1px dashed #2a2a2a; opacity: 0.3; cursor: default; }
+.vessel-card.vessel-empty:active { opacity: 0.3; }
 
-.slot-id { font-size: 9px; color: #aaa; margin-bottom: 4px; font-weight: bold; }
+.slot-id { font-size: 9px; color: #aaa; margin-bottom: 2px; font-weight: bold; }
+.card-vessel-name { font-size: 8px; color: #6a8aaf; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-days { font-size: 8px; color: #777; margin-top: 2px; }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────────── */
 .bubbles-row {
@@ -193,6 +199,7 @@ body {
   margin-bottom: 5px;
 }
 .detail-telem-row .telem-label { color: #aaa; font-size: 13px; }
+.detail-telem-row .telem-small { font-size: 11px; text-align: right; max-width: 60%; word-break: break-word; }
 .detail-telem-row .telem-value { font-size: 15px; font-weight: bold; color: #e0e0e0; }
 
 #detail-issues {
