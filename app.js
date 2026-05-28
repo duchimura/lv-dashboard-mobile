@@ -98,6 +98,13 @@ function makeCard(v) {
   // Empty slot — just show the ID, no bubbles or telemetry
   if (v.status === "empty") return card;
 
+  if (v.vesselName) {
+    const nameEl = document.createElement("div");
+    nameEl.className = "card-vessel-name";
+    nameEl.textContent = v.vesselName;
+    card.appendChild(nameEl);
+  }
+
   card.addEventListener("click", () => openDetail(v));
 
   const bubblesRow = document.createElement("div");
@@ -112,13 +119,15 @@ function makeCard(v) {
   if (v.status === "off") {
     telem.innerHTML = `<div class="dim">— °F</div><div class="dim">— l/m</div><div class="dim">— kPa</div>`;
   } else {
-    const tempClass = v.tBubble === "error" ? "warn" : "";
-    const flowClass = v.bBubble === "stopped" ? "err" : "";
+    const tempClass  = v.tBubble === "error" ? "warn" : "";
+    const flowClass  = v.bBubble === "stopped" ? "err" : "";
     const pressClass = (v.pressure !== null && v.pressure > 9) ? "err" : "";
+    const dayStr     = v.daysSince !== null ? `<div class="card-days">Day ${v.daysSince}</div>` : "";
     telem.innerHTML =
       `<div class="${tempClass}">${fmt(v.temp, "°F")}</div>` +
       `<div class="${flowClass}">${fmt(v.airflow, "l/m")}</div>` +
-      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>`;
+      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>` +
+      dayStr;
   }
 
   card.appendChild(bubblesRow);
@@ -136,7 +145,8 @@ function renderFleet(fleet) {
 
 /* ── Detail view ─────────────────────────────────────────────────────────── */
 function openDetail(v) {
-  document.getElementById("detail-title").textContent = `Vessel ${v.id}`;
+  document.getElementById("detail-title").textContent =
+    v.vesselName ? `${v.id} · ${v.vesselName}` : `Vessel ${v.id}`;
   const badge = document.getElementById("detail-status-badge");
   badge.textContent = v.status.toUpperCase();
   badge.className = `detail-status-badge ${v.status}`;
