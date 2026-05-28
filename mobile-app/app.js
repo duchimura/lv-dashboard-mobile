@@ -90,22 +90,38 @@ function makeCard(v) {
   const card = document.createElement("div");
   card.className = cardClass(v);
 
-  const id = document.createElement("div");
-  id.className = "slot-id";
-  id.textContent = v.id;
-  card.appendChild(id);
+  // Header row: slot ID · vessel name (center) · days (right)
+  const headerRow = document.createElement("div");
+  headerRow.className = "card-header-row";
 
-  // Empty slot — just show the ID, no bubbles or telemetry
-  if (v.status === "empty") return card;
+  const idEl = document.createElement("span");
+  idEl.className = "slot-id";
+  idEl.textContent = v.id;
+  headerRow.appendChild(idEl);
 
-  if (v.vesselName) {
-    const nameEl = document.createElement("div");
-    nameEl.className = "card-vessel-name";
-    nameEl.textContent = v.vesselName;
-    card.appendChild(nameEl);
+  // Empty slot — just show the header row
+  if (v.status === "empty") {
+    card.appendChild(headerRow);
+    return card;
   }
 
   card.addEventListener("click", () => openDetail(v));
+
+  if (v.vesselName) {
+    const nameEl = document.createElement("span");
+    nameEl.className = "card-vessel-name";
+    nameEl.textContent = `#${v.vesselName}`;
+    headerRow.appendChild(nameEl);
+  }
+
+  if (v.daysSince !== null) {
+    const daysEl = document.createElement("span");
+    daysEl.className = "card-days";
+    daysEl.textContent = `D${v.daysSince}`;
+    headerRow.appendChild(daysEl);
+  }
+
+  card.appendChild(headerRow);
 
   const bubblesRow = document.createElement("div");
   bubblesRow.className = "bubbles-row";
@@ -122,12 +138,10 @@ function makeCard(v) {
     const tempClass  = v.tBubble === "error" ? "warn" : "";
     const flowClass  = v.bBubble === "stopped" ? "err" : "";
     const pressClass = (v.pressure !== null && v.pressure > 9) ? "err" : "";
-    const dayStr     = v.daysSince !== null ? `<div class="card-days">Day ${v.daysSince}</div>` : "";
     telem.innerHTML =
       `<div class="${tempClass}">${fmt(v.temp, "°F")}</div>` +
       `<div class="${flowClass}">${fmt(v.airflow, "l/m")}</div>` +
-      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>` +
-      dayStr;
+      `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>`;
   }
 
   card.appendChild(bubblesRow);
