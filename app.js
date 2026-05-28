@@ -57,37 +57,31 @@ function fmt(v, unit) {
 /* ── Render grid ─────────────────────────────────────────────────────────── */
 function renderGrid(data) {
   const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
   const byRack = new Map();
   for (const v of (data.vessels ?? [])) {
     if (!byRack.has(v.rack)) byRack.set(v.rack, []);
     byRack.get(v.rack).push(v);
   }
 
-  const rackNums = [...byRack.keys()].sort((a, b) => a - b);
-  const existingRacks = new Map([...grid.querySelectorAll(".rack-section")]
-    .map(el => [parseInt(el.dataset.rack, 10), el]));
+  for (const rackNum of [...byRack.keys()].sort((a, b) => a - b)) {
+    const section = document.createElement("div");
+    section.className = "rack-section";
+    section.dataset.rack = rackNum;
 
-  for (const rackNum of rackNums) {
-    const vessels = byRack.get(rackNum).sort((a, b) => a.slot.localeCompare(b.slot));
-    let section = existingRacks.get(rackNum);
-    if (!section) {
-      section = document.createElement("div");
-      section.className = "rack-section";
-      section.dataset.rack = rackNum;
-      const label = document.createElement("div");
-      label.className = "rack-label";
-      label.textContent = `Rack ${rackNum}`;
-      section.appendChild(label);
-      const cards = document.createElement("div");
-      cards.className = "rack-cards";
-      section.appendChild(cards);
-      grid.appendChild(section);
-    }
-    const cardsEl = section.querySelector(".rack-cards");
-    cardsEl.innerHTML = "";
-    for (const v of vessels) {
+    const label = document.createElement("div");
+    label.className = "rack-label";
+    label.textContent = `Rack ${rackNum}`;
+    section.appendChild(label);
+
+    const cardsEl = document.createElement("div");
+    cardsEl.className = "rack-cards";
+    for (const v of byRack.get(rackNum).sort((a, b) => a.slot.localeCompare(b.slot))) {
       cardsEl.appendChild(makeCard(v));
     }
+    section.appendChild(cardsEl);
+    grid.appendChild(section);
   }
 }
 
@@ -184,6 +178,14 @@ function openDetail(v) {
   // Mechanical
   document.getElementById("detail-angle").textContent       = fmt(v.motorAngle, "°");
   document.getElementById("detail-mass").textContent        = fmt(v.mass, "lbs");
+  // Status strings
+  document.getElementById("detail-motor-status").textContent  = v.motorStatus   || "—";
+  document.getElementById("detail-mech-status").textContent   = v.mechStatus    || "—";
+  document.getElementById("detail-temp-status").textContent   = v.tempModStatus || "—";
+  // Uptime
+  const uptimeEl = document.getElementById("detail-uptime");
+  uptimeEl.textContent = v.uptimePct !== null && v.uptimePct !== undefined
+    ? `${v.uptimePct.toFixed(1)} %` : "—";
 
   const issuesEl = document.getElementById("detail-issues");
   const issues = Array.isArray(v.issues) ? v.issues : [];

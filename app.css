@@ -195,6 +195,7 @@ body {
   margin-bottom: 5px;
 }
 .detail-telem-row .telem-label { color: #aaa; font-size: 13px; }
+.detail-telem-row .telem-small { font-size: 11px; text-align: right; max-width: 60%; word-break: break-word; }
 .detail-telem-row .telem-value { font-size: 15px; font-weight: bold; color: #e0e0e0; }
 
 #detail-issues {
