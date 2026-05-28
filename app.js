@@ -224,6 +224,8 @@ function openDetail(v) {
 function closeDetail() {
   document.getElementById("detail").classList.remove("open");
   document.body.style.overflow = "";
+  // Re-render grid from last known data so empty slots always reappear correctly
+  if (_currentData) renderGrid(_currentData);
 }
 
 /* ── Main render ─────────────────────────────────────────────────────────── */

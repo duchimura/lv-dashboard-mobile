@@ -91,7 +91,7 @@ body {
 .vessel-card.issue-red    { background: #3a1e1e; border-color: #c00; }
 .vessel-card.issue-orange { background: #2a2a1e; border-color: #ff8800; }
 .vessel-card.vessel-off   { background: #1a1a1a; border-color: #2a2a2a; opacity: 0.5; }
-.vessel-card.vessel-empty { background: #161616; border: 1px dashed #2a2a2a; opacity: 0.3; cursor: default; }
+.vessel-card.vessel-empty { background: #161616; border: 1px dashed #2a2a2a; opacity: 0.3; cursor: default; min-height: 80px; }
 .vessel-card.vessel-empty:active { opacity: 0.3; }
 
 .card-header-row {
