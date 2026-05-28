@@ -94,9 +94,17 @@ body {
 .vessel-card.vessel-empty { background: #161616; border: 1px dashed #2a2a2a; opacity: 0.3; cursor: default; }
 .vessel-card.vessel-empty:active { opacity: 0.3; }
 
-.slot-id { font-size: 9px; color: #aaa; margin-bottom: 2px; font-weight: bold; }
-.card-vessel-name { font-size: 8px; color: #6a8aaf; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-days { font-size: 8px; color: #777; margin-top: 2px; }
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 4px;
+  gap: 2px;
+}
+.slot-id { font-size: 9px; color: #aaa; font-weight: bold; flex-shrink: 0; }
+.card-vessel-name { font-size: 8px; color: #6a8aaf; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-days { font-size: 8px; color: #666; flex-shrink: 0; }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────────── */
 .bubbles-row {
