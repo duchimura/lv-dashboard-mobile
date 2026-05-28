@@ -219,6 +219,7 @@ function openDetail(v) {
 
   document.getElementById("detail").classList.add("open");
   document.body.style.overflow = "hidden";
+  history.pushState({ detail: true }, "");
 }
 
 function closeDetail() {
@@ -265,7 +266,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  document.getElementById("detail-back").addEventListener("click", closeDetail);
+  // In-app back arrow uses history.back() so popstate fires and both
+  // the browser back button and the in-app button share one code path
+  document.getElementById("detail-back").addEventListener("click", () => history.back());
+  window.addEventListener("popstate", () => {
+    if (document.getElementById("detail").classList.contains("open")) {
+      closeDetail();
+    }
+  });
 
   const msg = document.getElementById("status-message");
   msg.textContent = "Loading…";

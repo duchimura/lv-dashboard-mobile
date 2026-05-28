@@ -158,7 +158,20 @@ body {
   position: sticky;
   top: 0;
 }
-#detail-back { color: #0f0; font-size: 20px; cursor: pointer; background: none; border: none; }
+#detail-back {
+  color: #0f0;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  position: relative;
+  top: -1px;
+}
 #detail-title { font-size: 16px; font-weight: bold; color: #f2e8d5; flex: 1; }
 #detail-status-badge {
   font-size: 10px;
