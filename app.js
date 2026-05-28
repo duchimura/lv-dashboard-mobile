@@ -96,7 +96,7 @@ function makeCard(v) {
 
   const idEl = document.createElement("span");
   idEl.className = "slot-id";
-  idEl.textContent = v.id;
+  idEl.textContent = v.vesselName ? `${v.id} - ${v.vesselName}` : v.id;
   headerRow.appendChild(idEl);
 
   // Empty slot — just show the header row
@@ -107,17 +107,10 @@ function makeCard(v) {
 
   card.addEventListener("click", () => openDetail(v));
 
-  if (v.vesselName) {
-    const nameEl = document.createElement("span");
-    nameEl.className = "card-vessel-name";
-    nameEl.textContent = `#${v.vesselName}`;
-    headerRow.appendChild(nameEl);
-  }
-
   if (v.daysSince !== null) {
     const daysEl = document.createElement("span");
     daysEl.className = "card-days";
-    daysEl.textContent = `D${v.daysSince}`;
+    daysEl.textContent = `${v.daysSince} days`;
     headerRow.appendChild(daysEl);
   }
 

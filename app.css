@@ -102,9 +102,8 @@ body {
   margin-bottom: 4px;
   gap: 2px;
 }
-.slot-id { font-size: 9px; color: #aaa; font-weight: bold; flex-shrink: 0; }
-.card-vessel-name { font-size: 8px; color: #6a8aaf; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.card-days { font-size: 8px; color: #666; flex-shrink: 0; }
+.slot-id { font-size: 9px; color: #ccc; font-weight: bold; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-days { font-size: 8px; color: #666; flex-shrink: 0; margin-left: 3px; }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────────── */
 .bubbles-row {
