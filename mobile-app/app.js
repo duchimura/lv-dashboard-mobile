@@ -41,6 +41,7 @@ function makeBubble(letter, state) {
 
 /* ── Card border class ───────────────────────────────────────────────────── */
 function cardClass(vessel) {
+  if (vessel.status === "empty") return "vessel-card vessel-empty";
   if (vessel.mBubble === "fault") return "vessel-card issue-orange";
   if (vessel.mBubble === "stopped" || vessel.tBubble === "error" || vessel.bBubble === "stopped")
     return "vessel-card issue-red";
@@ -94,11 +95,16 @@ function renderGrid(data) {
 function makeCard(v) {
   const card = document.createElement("div");
   card.className = cardClass(v);
-  card.addEventListener("click", () => openDetail(v));
 
   const id = document.createElement("div");
   id.className = "slot-id";
   id.textContent = v.id;
+  card.appendChild(id);
+
+  // Empty slot — just show the ID, no bubbles or telemetry
+  if (v.status === "empty") return card;
+
+  card.addEventListener("click", () => openDetail(v));
 
   const bubblesRow = document.createElement("div");
   bubblesRow.className = "bubbles-row";
@@ -121,7 +127,6 @@ function makeCard(v) {
       `<div class="${pressClass}">${fmt(v.pressure, "kPa")}</div>`;
   }
 
-  card.appendChild(id);
   card.appendChild(bubblesRow);
   card.appendChild(telem);
   return card;
@@ -166,9 +171,19 @@ function openDetail(v) {
     bubblesEl.appendChild(cell);
   }
 
-  document.getElementById("detail-temp").textContent     = fmt(v.temp, "°F");
-  document.getElementById("detail-airflow").textContent  = fmt(v.airflow, "l/m");
-  document.getElementById("detail-pressure").textContent = fmt(v.pressure, "kPa");
+  // Temperature section
+  document.getElementById("detail-temp").textContent        = fmt(v.temp, "°F");
+  document.getElementById("detail-heater").textContent      = fmt(v.heaterTemp, "°F");
+  const probes = Array.isArray(v.probes) ? v.probes : [null, null, null];
+  document.getElementById("detail-probe1").textContent      = fmt(probes[0], "°F");
+  document.getElementById("detail-probe2").textContent      = fmt(probes[1], "°F");
+  document.getElementById("detail-probe3").textContent      = fmt(probes[2], "°F");
+  // Airflow & pressure
+  document.getElementById("detail-airflow").textContent     = fmt(v.airflow, "l/m");
+  document.getElementById("detail-pressure").textContent    = fmt(v.pressure, "kPa");
+  // Mechanical
+  document.getElementById("detail-angle").textContent       = fmt(v.motorAngle, "°");
+  document.getElementById("detail-mass").textContent        = fmt(v.mass, "lbs");
 
   const issuesEl = document.getElementById("detail-issues");
   const issues = Array.isArray(v.issues) ? v.issues : [];

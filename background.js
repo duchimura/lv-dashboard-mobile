@@ -107,6 +107,11 @@ function _toF(c) {
     ? Math.round((c * 9 / 5 + 32) * 10) / 10
     : null;
 }
+function _toLbs(kg) {
+  return typeof kg === "number" && !isNaN(kg)
+    ? Math.round(kg * 2.20462 * 10) / 10
+    : null;
+}
 
 let _lastMobileSnapshotAt = 0;
 const MOBILE_SNAPSHOT_MS  = 15_000;
@@ -121,7 +126,19 @@ async function _buildMobilePayload() {
   const vessels = [];
 
   for (const [slotName, v] of Object.entries(dashboardState)) {
-    if (!v.vesselPresent) continue;
+    const rack = parseInt(slotName.slice(0, 3), 10);
+    const slot = slotName.slice(3);
+
+    if (!v.vesselPresent) {
+      vessels.push({
+        id: slotName, rack, slot, status: "empty",
+        mBubble: "off", tBubble: "off", bBubble: "off",
+        temp: null, heaterTemp: null, probes: [null, null, null],
+        airflow: null, pressure: null, motorAngle: null, mass: null,
+        issues: [], paused: false,
+      });
+      continue;
+    }
 
     const t   = v.telemetry || {};
     const mB  = _mBubble(slotName, v);
@@ -145,25 +162,29 @@ async function _buildMobilePayload() {
     else                                 off++;
     if (issueList.length) issues++;
 
-    const probes = [_toF(Number(t.temp0)), _toF(Number(t.temp1)), _toF(Number(t.temp2))]
-      .filter(x => x !== null);
-    const avgTemp = probes.length
-      ? Math.round(probes.reduce((a, b) => a + b, 0) / probes.length * 10) / 10
+    const p0 = _toF(Number(t.temp0)), p1 = _toF(Number(t.temp1)), p2 = _toF(Number(t.temp2));
+    const probeVals = [p0, p1, p2].filter(x => x !== null);
+    const avgTemp = probeVals.length
+      ? Math.round(probeVals.reduce((a, b) => a + b, 0) / probeVals.length * 10) / 10
       : null;
 
     vessels.push({
-      id:      slotName,
-      rack:    parseInt(slotName.slice(0, 3), 10),
-      slot:    slotName.slice(3),
-      status:  vesselStatus,
-      mBubble: mB,
-      tBubble: tB,
-      bBubble: bB,
-      temp:     avgTemp,
-      airflow:  typeof t.airflow   === "number" ? Math.round(t.airflow   * 10) / 10 : null,
-      pressure: typeof t.pressure  === "number" ? Math.round(t.pressure  * 100) / 100 : null,
-      issues:  issueList,
-      paused:  v.rackGroupPaused === true,
+      id:         slotName,
+      rack,
+      slot,
+      status:     vesselStatus,
+      mBubble:    mB,
+      tBubble:    tB,
+      bBubble:    bB,
+      temp:       avgTemp,
+      heaterTemp: _toF(Number(t.heaterTemp)),
+      probes:     [p0, p1, p2],
+      airflow:    typeof t.airflow      === "number" ? Math.round(t.airflow      * 10)  / 10  : null,
+      pressure:   typeof t.pressure     === "number" ? Math.round(t.pressure     * 100) / 100 : null,
+      motorAngle: typeof t.currentAngle === "number" ? Math.round(t.currentAngle * 10)  / 10  : null,
+      mass:       _toLbs(t.mass),
+      issues:     issueList,
+      paused:     v.rackGroupPaused === true,
     });
   }
 
@@ -549,6 +570,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === "dashboard:get") {
     sendResponse({ state: dashboardState, unrackedVessels });
+    // Trigger a fresh days scrape from the HMI tab so the badge is always current
+    chrome.tabs.query({ url: "https://atlas.earthfuneral.com/internal/hmi/*" })
+      .then((tabs) => {
+        for (const tab of tabs) {
+          chrome.tabs.sendMessage(tab.id, { type: "hmi:rescrape-days" }).catch(() => {});
+        }
+      }).catch(() => {});
     return true;
   }
 
@@ -1281,6 +1309,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
       }
 
+      if (typeof item.tempSetpointReached === "boolean") {
+        if (slot.tempSetpointReached !== item.tempSetpointReached) {
+          slot.tempSetpointReached = item.tempSetpointReached;
+          updates.push({
+            slotName: slot.slotName,
+            tempControlOn: slot.tempControlOn,
+            lastTempSet: slot.lastTempSet,
+          });
+        }
+      }
+
       // Blower setpoint scraped directly from the HMI input field — overrides
       // the API command history value so the watchdog acts on the live field state.
       if (typeof item.blowerSetpointFieldValue === "number") {
@@ -1329,6 +1368,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           ud.caseName = caseName;
           _saveUptimeData();
         }
+      }
+    }
+    return;
+  }
+
+  /* --------------------------------------------------------
+     HALL VIEW DAYS SCRAPE — content.js sends slot → days map
+     scraped from the hall-view DOM.  Stored on the vessel and
+     broadcast so the dashboard badge updates immediately.
+  -------------------------------------------------------- */
+  if (msg.type === "hmi:days-scrape") {
+    for (const [slot, days] of Object.entries(msg.slots || {})) {
+      const v = dashboardState[slot];
+      if (!v || typeof days !== "number") continue;
+      if (v.scrapedDays !== days) {
+        v.scrapedDays = days;
+        safeSend({ type: "dashboard:update", slotName: slot, vessel: v });
       }
     }
     return;
@@ -1657,14 +1713,16 @@ async function refreshRackState() {
             vessel?.human_name ?? vessel?.name ?? null;
           dashboardState[slot].status = vessel?.status ?? null;
           dashboardState[slot].statusDisplay = vessel?.status_display ?? null;
+          dashboardState[slot].lastUsed = vessel?.last_used ?? null;
         }
 
-        // Vessel removed → wipe stale telemetry and setpoints
+        // Vessel removed → wipe stale telemetry, setpoints, and scraped days
         if (wasPresent && !isPresent) {
           dashboardState[slot].telemetry = {};
           dashboardState[slot].setpoints = {};
           dashboardState[slot].lastTempSet = null;
           dashboardState[slot].tempControlOn = null;
+          dashboardState[slot].scrapedDays = null;
           _log(
             `🗑️ refreshRackState: vessel removed from ${slot} — telemetry cleared`,
           );
@@ -1960,6 +2018,17 @@ async function collectAllSetpoints() {
     );
 
     _log("✅ Setpoints collected and updated");
+
+    // Kiosk-only: scrape the open HMI panel so tempSetpointReached and
+    // tempControlOn stay current on the same 120 s cycle as the API calls.
+    if (_isWatchdogOwner()) {
+      chrome.tabs.query({ url: "https://atlas.earthfuneral.com/internal/hmi/*" })
+        .then((tabs) => {
+          for (const tab of tabs) {
+            chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_NOW" }).catch(() => {});
+          }
+        }).catch(() => {});
+    }
   } catch (err) {
     console.error("❌ collectAllSetpoints error:", err);
   } finally {
@@ -3276,7 +3345,7 @@ async function _pollGrafanaUptime() {
             rawSql: `SELECT ts, mixer_turning FROM rack_operational($__timeFrom(), $__timeTo(), '${rackId}')`,
             format: "table", rawQuery: true, refId: "A"
           }],
-          from: String(caseStart),
+          from: String(now - 24 * 60 * 60 * 1000),
           to:   String(now)
         })
       });
