@@ -132,9 +132,11 @@ async function _buildMobilePayload() {
     if (!v.vesselPresent) {
       vessels.push({
         id: slotName, rack, slot, status: "empty",
+        vesselName: null, daysSince: null,
         mBubble: "off", tBubble: "off", bBubble: "off",
         temp: null, heaterTemp: null, probes: [null, null, null],
         airflow: null, pressure: null, motorAngle: null, mass: null,
+        motorStatus: null, mechStatus: null, tempModStatus: null, uptimePct: null,
         issues: [], paused: false,
       });
       continue;
@@ -168,10 +170,15 @@ async function _buildMobilePayload() {
       ? Math.round(probeVals.reduce((a, b) => a + b, 0) / probeVals.length * 10) / 10
       : null;
 
+    const lastUsedMs  = v.lastUsed ? Date.parse(v.lastUsed) : null;
+    const daysSince   = lastUsedMs ? Math.floor((Date.now() - lastUsedMs) / 86_400_000) : null;
+
     vessels.push({
       id:         slotName,
       rack,
       slot,
+      vesselName: v.vesselName || null,
+      daysSince,
       status:     vesselStatus,
       mBubble:    mB,
       tBubble:    tB,
