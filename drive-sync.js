@@ -506,3 +506,62 @@ export async function writeVesselState(payload) {
   );
   if (!res.ok) throw new Error(`vessel state write ${res.status}`);
 }
+
+/* ── Phase color sync (Digital Vessel Rack sheet) ───────────────────────── */
+const SLOT_COLOR_SPREADSHEET_ID = "1EBmMaB72HpJaT1Wc7WfyDZkttzqPUoBX8AEEWYBoZpU";
+const SLOT_COLOR_RANGE           = "'Digital Vessel Rack'!B4:N21";
+const _SLOT_ID_RE                = /^(\d{1,2})([A-C])/;
+
+export async function readSlotColors() {
+  const tok    = await _getToken();
+  const fields = [
+    "sheets.data.rowData.values.formattedValue",
+    "sheets.data.rowData.values.effectiveFormat.backgroundColor",
+    "sheets.data.rowData.values.effectiveFormat.backgroundColorStyle",
+  ].join(",");
+  const url    = `https://sheets.googleapis.com/v4/spreadsheets/${SLOT_COLOR_SPREADSHEET_ID}`
+               + `?includeGridData=true`
+               + `&ranges=${encodeURIComponent(SLOT_COLOR_RANGE)}`
+               + `&fields=${encodeURIComponent(fields)}`;
+
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${tok}` } });
+  if (!res.ok) throw new Error(`slot colors ${res.status}: ${await res.text()}`);
+
+  const j    = await res.json();
+  const rows = j.sheets?.[0]?.data?.[0]?.rowData ?? [];
+  const colors = {};
+
+  for (let r = 0; r < rows.length; r++) {
+    const cells = rows[r]?.values ?? [];
+    for (let c = 0; c < cells.length; c++) {
+      const val   = (cells[c]?.formattedValue ?? "").trim();
+      const match = val.match(_SLOT_ID_RE);
+      if (!match) continue;
+
+      const slotName = match[1].padStart(3, "0") + match[2];
+
+      const colorRow  = rows[r + 4];
+      if (!colorRow) continue;
+      const colorCell = colorRow.values?.[c];
+      const fmt       = colorCell?.effectiveFormat;
+
+      // Prefer backgroundColorStyle.rgbColor; fall back to legacy backgroundColor.
+      // Google Sheets omits zero-valued RGB components entirely, so we default to 0
+      // (not 1) — a missing blue on a yellow cell must stay 0, not become 255.
+      const bg = fmt?.backgroundColorStyle?.rgbColor ?? fmt?.backgroundColor;
+      if (!bg) continue;
+
+      const _r = Math.round((bg.red   ?? 0) * 255);
+      const _g = Math.round((bg.green ?? 0) * 255);
+      const _b = Math.round((bg.blue  ?? 0) * 255);
+
+      // Skip pure-black (#000000) — that means no color was set (all components absent).
+      const hex = "#" + [_r, _g, _b].map(n => n.toString(16).padStart(2, "0")).join("");
+      if (hex === "#000000") continue;
+
+      colors[slotName] = hex;
+    }
+  }
+
+  return colors;
+}

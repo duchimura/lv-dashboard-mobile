@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0f3460" />
+  <title>Operations Status</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+
+  <div id="header">
+    <div id="header-title">
+      <h1>⚙ Operations</h1>
+      <span id="header-sub">Updates every 15 seconds</span>
+    </div>
+    <span id="live-indicator">● Connecting…</span>
+  </div>
+
+  <div id="stale-banner"></div>
+
+  <div id="fleet-summary">
+    <div class="fleet-chip running">
+      <span class="count">—</span>
+      <span class="label">Running</span>
+    </div>
+    <div class="fleet-chip issues">
+      <span class="count">—</span>
+      <span class="label">Issues</span>
+    </div>
+    <div class="fleet-chip fault">
+      <span class="count">—</span>
+      <span class="label">Fault</span>
+    </div>
+    <div class="fleet-chip off">
+      <span class="count">—</span>
+      <span class="label">Off</span>
+    </div>
+  </div>
+
+  <div id="status-message"></div>
+  <div id="grid"></div>
+
+  <!-- Detail view (full-screen overlay) -->
+  <div id="detail">
+    <div id="detail-header">
+      <button id="detail-back">&#8592;</button>
+      <span id="detail-title"></span>
+      <span id="detail-status-badge"></span>
+    </div>
+    <div id="detail-body">
+      <div class="detail-section-label" style="margin-bottom:6px">Status</div>
+      <div id="detail-bubbles"></div>
+
+      <div class="detail-section-label" style="margin-bottom:6px">Temperature</div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Avg Temp</span>
+        <span class="telem-value" id="detail-temp">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Heater Temp</span>
+        <span class="telem-value" id="detail-heater">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Probe 1</span>
+        <span class="telem-value" id="detail-probe1">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Probe 2</span>
+        <span class="telem-value" id="detail-probe2">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Probe 3</span>
+        <span class="telem-value" id="detail-probe3">—</span>
+      </div>
+
+      <div class="detail-section-label" style="margin-bottom:6px;margin-top:12px">Airflow &amp; Pressure</div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Airflow</span>
+        <span class="telem-value" id="detail-airflow">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Pressure</span>
+        <span class="telem-value" id="detail-pressure">—</span>
+      </div>
+
+      <div class="detail-section-label" style="margin-bottom:6px;margin-top:12px">Mechanical</div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Motor Angle</span>
+        <span class="telem-value" id="detail-angle">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Mass</span>
+        <span class="telem-value" id="detail-mass">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Motor Uptime</span>
+        <span class="telem-value" id="detail-uptime">—</span>
+      </div>
+
+      <div class="detail-section-label" style="margin-bottom:6px;margin-top:12px">System Status</div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Motor Msg</span>
+        <span class="telem-value telem-small" id="detail-motor-status">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Mech Status</span>
+        <span class="telem-value telem-small" id="detail-mech-status">—</span>
+      </div>
+      <div class="detail-telem-row">
+        <span class="telem-label">Temp Module</span>
+        <span class="telem-value telem-small" id="detail-temp-status">—</span>
+      </div>
+
+      <div id="detail-issues"></div>
+      <div id="detail-footer"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

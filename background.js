@@ -1,4 +1,4 @@
-import { readDriveState, writeDriveState, appendSetpointLogRows, appendMotorAuditRows, readUptimeState, writeUptimeState, writeVesselState } from "./drive-sync.js";
+import { readDriveState, writeDriveState, appendSetpointLogRows, appendMotorAuditRows, readUptimeState, writeUptimeState, writeVesselState, readSlotColors } from "./drive-sync.js";
 
 // date+time stamp for every console.log post
 function _log(...args) {
@@ -9,6 +9,7 @@ function _log(...args) {
 let dashboardState = {};
 let vesselIdToSlot = {}; // numeric vessel_id → slot name (e.g. 36 → "001A")
 let unrackedVessels = []; // [{ id, name }, …] vessels not assigned to any rack slot
+let _slotColors = {}; // slotName → hex color from Digital Vessel Rack sheet
 
 // ═══ UPTIME TRACKING ════════════════════════════════════════════════════════
 // Owner (kiosk PC) polls Grafana every 2 min and writes results to Drive.
@@ -203,6 +204,7 @@ async function _buildMobilePayload() {
     updated: new Date().toISOString(),
     fleet:   { running, off, stopped, fault, issues },
     vessels,
+    slotColors: _slotColors,
     watchdog: { enabled: watchdogEnabled },
   };
 }
@@ -252,6 +254,21 @@ chrome.tabs.onCreated.addListener((tab) => {
     _log("🔒 Dashboard tab protected from discard:", tab.id);
   }
 });
+
+// PHASE COLOR SYNC — reads slot background colors from the Digital Vessel Rack sheet
+async function _fetchSlotColors() {
+  try {
+    const colors = await readSlotColors();
+    _slotColors = colors;
+    const dashTabs = await chrome.tabs.query({ url: chrome.runtime.getURL("dashboard.html") });
+    for (const tab of dashTabs) {
+      chrome.tabs.sendMessage(tab.id, { type: "dashboard:colors-update", colors }).catch(() => {});
+    }
+    _log(`🎨 Slot colors refreshed: ${Object.keys(colors).length} slots`);
+  } catch (e) {
+    _log("⚠️ [SLOT COLORS] fetch failed:", e.message);
+  }
+}
 
 // SAFE MESSAGE SENDER
 function safeSend(msg) {
@@ -355,6 +372,8 @@ function injectWSHook(tabId) {
         console.log("✅ HOOK ACTIVE");
       })();
     },
+  }).catch(() => {
+    injectedTabs.delete(tabId); // allow retry on next event (e.g. "complete")
   });
 }
 
@@ -391,7 +410,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 
   if (!tab.url?.includes("/internal/hmi/")) return;
-  if (changeInfo.status === "loading" || changeInfo.status === "complete") {
+  if (changeInfo.status === "complete") {
     injectWSHook(tabId);
   }
 });
@@ -580,7 +599,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "dashboard:get") {
-    sendResponse({ state: dashboardState, unrackedVessels });
+    sendResponse({ state: dashboardState, unrackedVessels, slotColors: _slotColors });
     // Trigger a fresh days scrape from the HMI tab so the badge is always current
     chrome.tabs.query({ url: "https://atlas.earthfuneral.com/internal/hmi/*" })
       .then((tabs) => {
@@ -1320,17 +1339,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
       }
 
-      if (typeof item.tempSetpointReached === "boolean") {
-        if (slot.tempSetpointReached !== item.tempSetpointReached) {
-          slot.tempSetpointReached = item.tempSetpointReached;
-          updates.push({
-            slotName: slot.slotName,
-            tempControlOn: slot.tempControlOn,
-            lastTempSet: slot.lastTempSet,
-          });
-        }
-      }
-
       // Blower setpoint scraped directly from the HMI input field — overrides
       // the API command history value so the watchdog acts on the live field state.
       if (typeof item.blowerSetpointFieldValue === "number") {
@@ -1362,10 +1370,21 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === "hmi:case-names") {
     // Only the kiosk/owner machine tracks case changes and writes uptime data
     if (_isWatchdogOwner()) {
+      let _caseNamesChanged = false;
       for (const [slotName, caseName] of Object.entries(msg.slots)) {
-        _hallViewCaseNames[slotName] = caseName;
+        if (_hallViewCaseNames[slotName] !== caseName) {
+          _hallViewCaseNames[slotName] = caseName;
+          _caseNamesChanged = true;
+        }
         const v = dashboardState[slotName];
         if (!v || v.vesselId == null) continue;
+
+        // Store on vessel state so dashboard can display it in the card header
+        if (v.caseName !== caseName) {
+          v.caseName = caseName;
+          safeSend({ type: "dashboard:update", slotName, vessel: v });
+        }
+
         const vId = v.vesselId;
         const ud  = _uptimeData[vId];
         if (!ud) {
@@ -1379,6 +1398,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           ud.caseName = caseName;
           _saveUptimeData();
         }
+      }
+      // Persist case names to Drive (embedded in uptime_sync.json) so other machines pick them up.
+      if (_caseNamesChanged) {
+        _saveUptimeData();
       }
     }
     return;
@@ -1584,6 +1607,11 @@ chrome.action.onClicked.addListener(() => {
   setTimeout(collectAllSetpoints, 5000);
   setInterval(collectAllSetpoints, 120000);
 
+  // Fetch slot phase colors from the Digital Vessel Rack sheet on startup,
+  // then refresh every 5 minutes.
+  setTimeout(_fetchSlotColors, 12000);
+  setInterval(_fetchSlotColors, 5 * 60 * 1000);
+
   // Poll the live blower setpoint input field from each vessel's HMI v2 page.
   // Offset by 60 s so it doesn't overlap with collectAllSetpoints.
   // Runs sequentially (one popup per vessel) — ~3-5 s per vessel at most.
@@ -1734,6 +1762,7 @@ async function refreshRackState() {
           dashboardState[slot].lastTempSet = null;
           dashboardState[slot].tempControlOn = null;
           dashboardState[slot].scrapedDays = null;
+          dashboardState[slot].caseName = null;
           _log(
             `🗑️ refreshRackState: vessel removed from ${slot} — telemetry cleared`,
           );
@@ -1751,6 +1780,17 @@ async function refreshRackState() {
             slotName: slot,
             vessel: dashboardState[slot],
           });
+        }
+
+        // Slot presence changed — trigger an immediate hall view re-scrape on the
+        // kiosk so caseName updates without waiting for the next MutationObserver tick.
+        if (_isWatchdogOwner() && wasPresent !== isPresent) {
+          chrome.tabs.query({ url: "https://atlas.earthfuneral.com/internal/hmi/*" })
+            .then((tabs) => {
+              for (const tab of tabs) {
+                chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_HALL_VIEW_NOW" }).catch(() => {});
+              }
+            }).catch(() => {});
         }
       }
     }
@@ -2029,17 +2069,6 @@ async function collectAllSetpoints() {
     );
 
     _log("✅ Setpoints collected and updated");
-
-    // Kiosk-only: scrape the open HMI panel so tempSetpointReached and
-    // tempControlOn stay current on the same 120 s cycle as the API calls.
-    if (_isWatchdogOwner()) {
-      chrome.tabs.query({ url: "https://atlas.earthfuneral.com/internal/hmi/*" })
-        .then((tabs) => {
-          for (const tab of tabs) {
-            chrome.tabs.sendMessage(tab.id, { type: "SCRAPE_NOW" }).catch(() => {});
-          }
-        }).catch(() => {});
-    }
   } catch (err) {
     console.error("❌ collectAllSetpoints error:", err);
   } finally {
@@ -2081,11 +2110,10 @@ async function collectBlowerSetpointsFromHmi() {
         const results = await chrome.scripting.executeScript({
           target: { tabId },
           world: "MAIN",
-          func: (sel) => {
-            const el = document.querySelector(sel);
-            if (!el) return null;
-            const val = parseFloat(el.value);
-            return isNaN(val) ? null : val;
+          func: (blowerSel) => {
+            const blowerEl = document.querySelector(blowerSel);
+            const blowerVal = blowerEl ? parseFloat(blowerEl.value) : null;
+            return (blowerVal !== null && !isNaN(blowerVal)) ? blowerVal : null;
           },
           args: [BLOWER_SP_SELECTOR],
         });
@@ -3117,7 +3145,7 @@ async function _watchdogTick() {
     }
 
     const DECLOG_COOLDOWN_MS        = 60_000;
-    const BLOWER_COOLDOWN_MS        = 3 * 60_000;
+    const BLOWER_COOLDOWN_MS        = 5 * 60_000;
     const declogRecentlyCleared     = (v.lastDeclogClearedAt      ?? 0) > Date.now() - DECLOG_COOLDOWN_MS;
     const blowerSetpointRecentlySent = (v.lastBlowerSetpointSentAt ?? 0) > Date.now() - BLOWER_COOLDOWN_MS;
     const rawAirflowSp              = v.setpoints?.airflowSp;
@@ -3206,7 +3234,7 @@ async function _watchdogTick() {
       }
     } else if (!blowerOn && blowerSetpointRecentlySent) {
       const secsAgo = Math.round((Date.now() - v.lastBlowerSetpointSentAt) / 1000);
-      _log(`⏳ [WATCHDOG] ${slotName} BLOWER OFF — setpoint sent ${secsAgo}s ago, waiting for state to settle (3 min cooldown)`);
+      _log(`⏳ [WATCHDOG] ${slotName} BLOWER OFF — setpoint sent ${secsAgo}s ago, waiting for state to settle (5 min cooldown)`);
     } else if (!blowerOn && declogRecentlyCleared) {
       const secsAgo = Math.round((Date.now() - v.lastDeclogClearedAt) / 1000);
       _log(`⏳ [WATCHDOG] ${slotName} BLOWER OFF — declog cleared ${secsAgo}s ago, skipping (60s cooldown)`);
@@ -3308,6 +3336,8 @@ function _saveUptimeData() {
   const snapshot = {};
   for (const [vId, ud] of Object.entries(_uptimeData))
     snapshot[vId] = { ...ud };
+  // Embed case names so readers get them from the same uptime_sync.json file.
+  snapshot.__caseNames__ = { ..._hallViewCaseNames };
   chrome.storage.local.set({ vesselUptime: snapshot });
   writeUptimeState(snapshot).catch(e => _log("⚠️ [UPTIME] Drive write:", e.message));
 }
@@ -3315,7 +3345,22 @@ function _saveUptimeData() {
 async function _pollDriveUptime() {
   try {
     const remote = await readUptimeState();
-    if (remote && typeof remote === "object") _uptimeData = remote;
+    if (remote && typeof remote === "object") {
+      // Separate the embedded case names from the uptime records.
+      const { __caseNames__, ...uptimeOnly } = remote;
+      _uptimeData = uptimeOnly;
+      // Apply case names to local dashboardState and push updates to dashboard tabs.
+      if (__caseNames__ && typeof __caseNames__ === "object") {
+        for (const [slotName, caseName] of Object.entries(__caseNames__)) {
+          const v = dashboardState[slotName];
+          if (!v || typeof caseName !== "string") continue;
+          if (v.caseName !== caseName) {
+            v.caseName = caseName;
+            safeSend({ type: "dashboard:update", slotName, vessel: v });
+          }
+        }
+      }
+    }
   } catch (e) {
     _log("⚠️ [UPTIME] Drive read:", e.message);
   }
@@ -3389,6 +3434,9 @@ setInterval(() => {
   else _pollDriveUptime();
 }, 120_000);
 // ════════════════════════════════════════════════════════════════════════════
+
+// (Case names are now embedded in uptime_sync.json and applied by _pollDriveUptime.
+//  No separate poll function needed.)
 
 // Initialize the stable machine ID, then restore watchdog and kick off Drive sync.
 // All ownership checks depend on _machineId so nothing runs until it's loaded.

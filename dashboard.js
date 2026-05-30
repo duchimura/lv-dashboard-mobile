@@ -5,6 +5,37 @@ function _log(...args) {
 }
 
 let state = {};
+let slotColors = {}; // slotName → hex color from Digital Vessel Rack sheet
+
+// Map a phase hex color to a segment count (1–4) for the bottom progress bar.
+// Classification is HSL-based so it works with approximate/varied shades.
+// Phase order: Biofirst(1) → PFRP(2) → Compost(3) → DryDown(4)
+function _hexToPhaseSegments(hex) {
+  if (!hex) return 0;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const s = max === min ? 0 : l > 0.5
+    ? (max - min) / (2 - max - min)
+    : (max - min) / (max + min);
+
+  if (l > 0.88)              return 3;  // near-white  → Compost
+  if (s < 0.12 && l > 0.25) return 4;  // achromatic  → Dry Down
+
+  // Chromatic: compute hue (0–360°)
+  let h = 0;
+  const d = max - min;
+  if (max === r)      h = 60 * (((g - b) / d) % 6);
+  else if (max === g) h = 60 * ((b - r) / d + 2);
+  else                h = 60 * ((r - g) / d + 4);
+  if (h < 0) h += 360;
+
+  if (h >= 40 && h <= 80) return 1;  // yellow / amber  → Biofirst
+  if (h >= 10 && h <  40) return 2;  // orange / terracotta → PFRP
+  return 1;                           // fallback → phase 1
+}
 let lastHeartbeat = 0;
 let lastAngles = {};
 let motorActiveUntil = {};
@@ -597,7 +628,8 @@ function createCard(slotName) {
 
   // ═══ UPTIME PROTOTYPE START ════════════════════════════════════════════════
   if (UPTIME_PROTO_ENABLED) {
-    const _r = 18, _circ = +(2 * Math.PI * _r).toFixed(2);
+    const _r = 18,
+      _circ = +(2 * Math.PI * _r).toFixed(2);
     const _demoPct = 94.2;
     const _offset = +((1 - _demoPct / 100) * _circ).toFixed(2);
     const _uptimeBadge = document.createElement("div");
@@ -609,10 +641,10 @@ function createCard(slotName) {
           transform="rotate(-90 22 22)"
           stroke-dasharray="${_circ}"
           stroke-dashoffset="${_offset}"/>
-        <text class="uptime-proto-num" x="22" y="20" text-anchor="middle">94.2</text>
-        <text class="uptime-proto-sym" x="22" y="29" text-anchor="middle">%</text>
+        <text class="uptime-proto-num" x="22" y="22" text-anchor="middle" dominant-baseline="central">94.2</text>
+        <!-- <text class="uptime-proto-sym" x="22" y="29" text-anchor="middle">%</text> -->
       </svg>
-      <div class="uptime-proto-lbl">UPTIME</div>
+      <div class="uptime-proto-lbl">24H</div>
       <div class="uptime-proto-compact">94.2<span class="uptime-proto-compact-pct">%</span></div>`;
     card.appendChild(_uptimeBadge);
   }
@@ -720,6 +752,19 @@ function createCard(slotName) {
   issuesStrip.className = "card-issues-strip";
   card.appendChild(issuesStrip);
 
+  const badgeGroup = document.createElement("div");
+  badgeGroup.className = "badge-group";
+
+  const nameBadge = document.createElement("div");
+  nameBadge.className = "name-badge";
+  badgeGroup.appendChild(nameBadge);
+
+  const daysBadge = document.createElement("div");
+  daysBadge.className = "days-badge";
+  badgeGroup.appendChild(daysBadge);
+
+  card.appendChild(badgeGroup);
+
   // Temp-sp hover tooltip
   const tempSpHover = card.querySelector(".temp-sp");
   if (tempSpHover) {
@@ -812,6 +857,7 @@ function updateCard(slotName, v) {
     if (declog) declog.style.display = "none";
     const statusValue = card.querySelector(".status-value");
     if (statusValue) statusValue.textContent = "—";
+    card.style.background = "";
     return;
   }
 
@@ -1159,7 +1205,6 @@ function updateCard(slotName, v) {
   const sp = v.setpoints || {};
   const tempSpF = typeof sp.tempSp === "number" ? sp.tempSp : null;
   const tempReadingEl = card.querySelector(".temp-reading");
-  const _tLiveClass = _tNearSetpoint ? " temp-setpoint-reached" : "";
   const _tFVal = toF(t.processTemp);
   const _tRedAlarm = typeof _tFVal === "number" && _tFVal > 145;
   const _tOrangeAlarm =
@@ -1167,6 +1212,14 @@ function updateCard(slotName, v) {
     typeof _tFVal === "number" &&
     tempSpF !== null &&
     _tFVal >= tempSpF + 5;
+  // Green when temp is within 2°F below the setpoint (or above, up to the orange threshold).
+  const _tShowGreen =
+    !_tRedAlarm &&
+    !_tOrangeAlarm &&
+    tempSpF !== null &&
+    typeof _tFVal === "number" &&
+    _tFVal >= tempSpF - 2;
+  const _tLiveClass = _tShowGreen ? " temp-setpoint-reached" : "";
   const _tAlarmClass = _tRedAlarm
     ? " temp-thermal-runaway"
     : _tOrangeAlarm
@@ -1177,7 +1230,7 @@ function updateCard(slotName, v) {
   const tempSpEl = card.querySelector(".temp-sp");
   if (tempSpEl) {
     tempSpEl.textContent = tempSpF !== null ? `${tempSpF}°F` : "";
-    tempSpEl.classList.toggle("temp-setpoint-reached", _tNearSetpoint);
+    tempSpEl.classList.toggle("temp-setpoint-reached", _tShowGreen);
     // Store last-set data for hover tooltip (populated from HMI scrape)
     const lts = v.lastTempSet;
     tempSpEl.dataset.lastTempValue = lts?.value || "";
@@ -1261,25 +1314,85 @@ function updateCard(slotName, v) {
   );
   */
 
+  // ═══ NAME BADGE (top-left) + DAYS BADGE (top-right) ═══════════════════════
+  const _nameBadge = card.querySelector(".name-badge");
+  const _daysBadge = card.querySelector(".days-badge");
+
+  if (!hasVessel) {
+    if (_nameBadge) _nameBadge.style.display = "none";
+    if (_daysBadge) _daysBadge.style.display = "none";
+  } else {
+    // Last name from hall-view case name scrape (e.g. "John Smith" → "Smith").
+    // caseName is a multi-word person name; split and take the last word.
+    const _caseName = (v.caseName || "").trim();
+    const _lastName = _caseName.length > 0 ? _caseName.split(/\s+/).pop() : "";
+
+    if (_nameBadge) {
+      if (_lastName) {
+        _nameBadge.textContent = _lastName;
+        _nameBadge.style.display = "";
+      } else {
+        _nameBadge.style.display = "none";
+      }
+    }
+
+    // Days — prefer HMI hall-view scrape (exact), fall back to last_used calc.
+    if (_daysBadge) {
+      let _days = null;
+      if (v.scrapedDays != null) {
+        _days = v.scrapedDays;
+      } else {
+        const _lu = v.lastUsed ? new Date(v.lastUsed) : null;
+        if (_lu && !isNaN(_lu)) {
+          const _startLocal = new Date(
+            _lu.getFullYear(),
+            _lu.getMonth(),
+            _lu.getDate(),
+          );
+          const _todayLocal = new Date();
+          _todayLocal.setHours(0, 0, 0, 0);
+          _days = Math.round((_todayLocal - _startLocal) / 86400000);
+        }
+      }
+      if (_days != null) {
+        _daysBadge.textContent = `${_days} days`;
+        _daysBadge.style.display = "";
+      } else {
+        _daysBadge.style.display = "none";
+      }
+    }
+  }
+  // ═══════════════════════════════════════════════════════════════════════════
+
   // ═══ UPTIME PROTOTYPE — update badge with live data ════════════════════════
   if (UPTIME_PROTO_ENABLED) {
     const _badge = card.querySelector(".uptime-proto");
     if (_badge) {
       _badge.classList.toggle("compact", !colVisibility["probes"]);
 
-      const _pct = (hasVessel && v.motorUptimePct != null) ? v.motorUptimePct : null;
+      const _pct =
+        hasVessel && v.motorUptimePct != null ? v.motorUptimePct : null;
       const _pctStr = _pct != null ? _pct.toFixed(1) : "—";
-      const _color  = _pct == null ? "#666"
-                    : _pct >= 90  ? "#2ecc71"
-                    : _pct >= 75  ? "#f39c12"
-                    :               "#e74c3c";
+      const _color =
+        _pct == null
+          ? "#666"
+          : _pct >= 90
+            ? "#2ecc71"
+            : _pct >= 75
+              ? "#f39c12"
+              : "#e74c3c";
 
       // SVG arc
       const _arc = _badge.querySelector(".uptime-proto-arc");
       if (_arc) {
-        const _circ = parseFloat(_arc.getAttribute("stroke-dasharray")) || 113.1;
-        _arc.setAttribute("stroke-dashoffset",
-          _pct != null ? ((_circ * (1 - _pct / 100)).toFixed(2)) : _circ.toFixed(2));
+        const _circ =
+          parseFloat(_arc.getAttribute("stroke-dasharray")) || 113.1;
+        _arc.setAttribute(
+          "stroke-dashoffset",
+          _pct != null
+            ? (_circ * (1 - _pct / 100)).toFixed(2)
+            : _circ.toFixed(2),
+        );
         _arc.style.stroke = _color;
       }
 
@@ -1301,6 +1414,34 @@ function updateCard(slotName, v) {
     }
   }
   // ════════════════════════════════════════════════════════════════════════════
+
+  // PHASE PROGRESS BAR — 4 equal segments at card bottom.
+  // Each segment has a fixed phase color; segments fill left-to-right as the
+  // vessel advances through the lifecycle.  The spreadsheet hex determines how
+  // many segments are lit; each lit segment shows its OWN phase color.
+  //   seg 1 = Biofirst (yellow)
+  //   seg 2 = PFRP     (orange)
+  //   seg 3 = Compost  (white)
+  //   seg 4 = Dry Down (gray)
+  const _PHASE_SEG_COLORS = ["#ffd966", "#f4a030", "#ffffff", "#999999"];
+  card.style.background = ""; // clear any legacy card tint
+  const _phaseHex  = slotColors[slotName];
+  const _phaseSegs = _hexToPhaseSegments(_phaseHex);
+  const _emptyCol  = "var(--bg)"; // matches page/grid background → makes unfilled sections invisible
+  // Hide the card's own border-bottom when a phase bar is present so the 1px
+  // border line doesn't bleed through the empty segments at the card corners.
+  card.style.borderBottomColor = _phaseSegs > 0 ? "transparent" : "";
+  card.style.setProperty("--ps1", _phaseSegs >= 1 ? _PHASE_SEG_COLORS[0] : _emptyCol);
+  card.style.setProperty("--ps2", _phaseSegs >= 2 ? _PHASE_SEG_COLORS[1] : _emptyCol);
+  card.style.setProperty("--ps3", _phaseSegs >= 3 ? _PHASE_SEG_COLORS[2] : _emptyCol);
+  card.style.setProperty("--ps4", _phaseSegs >= 4 ? _PHASE_SEG_COLORS[3] : _emptyCol);
+
+  // Ensure name badge is unstyled (no leftover pill coloring)
+  if (_nameBadge) {
+    _nameBadge.style.background  = "";
+    _nameBadge.style.color       = "";
+    _nameBadge.style.borderColor = "";
+  }
 }
 
 //COLUMN PAUSE STATE SYNC
@@ -1428,6 +1569,7 @@ function loadInitialState() {
     window.state = state; // alias for console debugging
     _log("✅ Initial state loaded", state);
     unrackedVessels = resp.unrackedVessels || [];
+    slotColors = resp.slotColors || {};
     renderUnrackedStrip();
 
     // Trigger immediate setpoint collection so T bubbles and setpoints
@@ -1585,6 +1727,12 @@ chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === "dashboard:unracked-update") {
     unrackedVessels = msg.unrackedVessels || [];
     renderUnrackedStrip();
+    return;
+  }
+
+  if (msg.type === "dashboard:colors-update") {
+    slotColors = msg.colors || {};
+    scheduleRender();
     return;
   }
 
@@ -1870,7 +2018,7 @@ gridReverseToggle.addEventListener("click", () => {
   animWrap.addEventListener(
     "animationend",
     () => animWrap.classList.remove("flip-animating"),
-    { once: true }
+    { once: true },
   );
 });
 
@@ -3794,8 +3942,15 @@ function _kioskZoomToVisibleCards() {
   // In issues mode the filter bar is fixed above the card area — use its bottom
   // edge as the top boundary so the card block is never placed behind it.
   let topBoundary = gridMT;
-  if (issuesModeActive && issuesFilterBar && issuesFilterBar.offsetParent !== null) {
-    topBoundary = Math.max(gridMT, issuesFilterBar.getBoundingClientRect().bottom);
+  if (
+    issuesModeActive &&
+    issuesFilterBar &&
+    issuesFilterBar.offsetParent !== null
+  ) {
+    topBoundary = Math.max(
+      gridMT,
+      issuesFilterBar.getBoundingClientRect().bottom,
+    );
   }
 
   // Available space below the header (or filter bar) and above the bottom panel
@@ -4219,18 +4374,25 @@ function _kioskZoomToVisibleCards() {
     if (type === "x-posts") {
       const tweet = data.tweets[Math.floor(Math.random() * data.tweets.length)];
       const safeText = (tweet.text || "")
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
         .replace(/\n/g, "<br>");
       const date = tweet.time
-        ? new Date(tweet.time).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+        ? new Date(tweet.time).toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          })
         : "";
       const avatarHtml = tweet.profileImg
         ? `<img class="ent-tweet-avatar" src="${tweet.profileImg}" alt="">`
         : `<div class="ent-tweet-avatar ent-tweet-avatar-placeholder"></div>`;
       const imgsHtml = tweet.imgs?.length
-        ? `<div class="ent-tweet-images ent-tweet-img-${Math.min(tweet.imgs.length, 4)}">${
-            tweet.imgs.slice(0, 4).map(u => `<img src="${u}" alt="">`).join("")
-          }</div>`
+        ? `<div class="ent-tweet-images ent-tweet-img-${Math.min(tweet.imgs.length, 4)}">${tweet.imgs
+            .slice(0, 4)
+            .map((u) => `<img src="${u}" alt="">`)
+            .join("")}</div>`
         : "";
       return {
         cls: "ent-x-posts",
@@ -4542,7 +4704,12 @@ function _kioskZoomToVisibleCards() {
         const xResult = await new Promise((resolve) =>
           chrome.runtime.sendMessage({ type: "x:fetch-from-tab" }, resolve),
         );
-        console.log("[ent] x-posts result:", xResult?.ok, "tweets:", xResult?.tweets?.length);
+        console.log(
+          "[ent] x-posts result:",
+          xResult?.ok,
+          "tweets:",
+          xResult?.tweets?.length,
+        );
         if (!xResult?.ok || !xResult.tweets?.length) return null;
         // tweets is now an array of oEmbed HTML strings
         return { tweets: xResult.tweets };
@@ -4755,12 +4922,18 @@ function _kioskZoomToVisibleCards() {
     console.log("[testXcancel] fetching from x.com tab...");
     const xResult = await new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: "x:fetch-from-tab" }, (resp) => {
-        if (chrome.runtime.lastError) console.error("[testXcancel] lastError:", chrome.runtime.lastError.message);
+        if (chrome.runtime.lastError)
+          console.error(
+            "[testXcancel] lastError:",
+            chrome.runtime.lastError.message,
+          );
         resolve(resp);
       });
     });
     if (xResult?.reason === "no-tab") {
-      console.warn("[testXcancel] open https://x.com/Earth_Funeral in a tab and stay logged in, then re-run");
+      console.warn(
+        "[testXcancel] open https://x.com/Earth_Funeral in a tab and stay logged in, then re-run",
+      );
       return;
     }
     if (!xResult?.ok || !xResult.tweets?.length) {
@@ -4768,9 +4941,13 @@ function _kioskZoomToVisibleCards() {
       return;
     }
     console.log(`[testXcancel] got ${xResult.tweets.length} tweets`);
-    xResult.tweets.forEach((t, i) => console.log(`  [${i}] @${t.handle}: ${t.text?.slice(0, 80)}`));
+    xResult.tweets.forEach((t, i) =>
+      console.log(`  [${i}] @${t.handle}: ${t.text?.slice(0, 80)}`),
+    );
     _entCache["x-posts"] = { tweets: xResult.tweets };
-    console.log("[testXcancel] DONE — cache populated, entDebug(true) will show the slide");
+    console.log(
+      "[testXcancel] DONE — cache populated, entDebug(true) will show the slide",
+    );
   };
 })();
 

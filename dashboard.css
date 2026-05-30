@@ -242,7 +242,7 @@ body {
   display: grid;
   grid-template-columns: repeat(13, var(--card-size));
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 13px;
   width: max-content;
   pointer-events: none;
 }
@@ -441,7 +441,7 @@ body.zoom-fit #grid-wrapper {
   grid-template-columns: repeat(13, var(--card-size));
   grid-template-rows: repeat(3, auto);
   grid-auto-flow: column;
-  gap: 6px;
+  gap: 18px 6px; /* row-gap 18px gives the days chip clearance above the card */
   width: auto;
   min-width: 0;
   overflow: visible !important;
@@ -485,7 +485,7 @@ body.zoom-fit {
   border: 1px solid var(--border);
   border-radius: 6px;
 
-  padding: 8px;
+  padding: 20px 8px 8px;
   box-sizing: border-box;
   color: var(--text);
 
@@ -497,14 +497,40 @@ body.zoom-fit {
     box-shadow 0.2s ease;
 }
 
-/* Top-3 issue cards in full grid view */
+/* Phase progress bar — 4 equal segments at card bottom.
+   bottom: -1px so the element overlaps the card's 1px border-bottom,
+   letting var(--bg) segments visually erase that portion of the border.
+   --ps1..--ps4 are set by JS: phase color when filled, var(--bg) when empty. */
+.card::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 2px;
+  right: 2px;
+  height: 5px;
+  border-radius: 0 0 5px 5px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    to right,
+    var(--ps1, var(--bg)) 0%,              var(--ps1, var(--bg)) calc(25% - 1px),
+    var(--bg)             calc(25% - 1px), var(--bg)             calc(25% + 1px),
+    var(--ps2, var(--bg)) calc(25% + 1px), var(--ps2, var(--bg)) calc(50% - 1px),
+    var(--bg)             calc(50% - 1px), var(--bg)             calc(50% + 1px),
+    var(--ps3, var(--bg)) calc(50% + 1px), var(--ps3, var(--bg)) calc(75% - 1px),
+    var(--bg)             calc(75% - 1px), var(--bg)             calc(75% + 1px),
+    var(--ps4, var(--bg)) calc(75% + 1px), var(--ps4, var(--bg)) 100%
+  );
+}
+
+/* Top-3 issue cards — teal border + subtle teal background tint */
 .card.top-issue-card {
-  background: rgba(20, 184, 166, 0.22) !important;
-  border: 2px solid rgba(20, 184, 166, 0.85) !important;
+  border: 3px solid rgba(20, 184, 166, 0.9) !important;
+  background: linear-gradient(rgba(20, 184, 166, 0.18), rgba(20, 184, 166, 0.18)), var(--card-bg) !important;
 }
 :root.dark .card.top-issue-card {
-  background: rgba(20, 184, 166, 0.28) !important;
-  border: 2px solid rgba(20, 184, 166, 0.9) !important;
+  border: 3px solid rgba(20, 184, 166, 0.95) !important;
+  background: linear-gradient(rgba(20, 184, 166, 0.20), rgba(20, 184, 166, 0.20)), var(--card-bg) !important;
 }
 
 body.zoom-fit .card:hover {
@@ -538,12 +564,38 @@ body.zoom-fit .card:hover {
   filter: grayscale(0.6);
 }
 
+.badge-group {
+  position: absolute;
+  top: 0;
+  left: 6px;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.name-badge,
+.days-badge {
+  background: var(--card-bg, #1e1e2e);
+  border: 1px solid var(--border, #444);
+  border-radius: 10px;
+  padding: 2px 7px 5px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-muted, #999);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+}
+
 /* ============================================================
    BUBBLES
    ============================================================ */
 .bubbles {
   position: absolute;
-  top: 6px;
+  top: 16px;
   right: 6px;
   display: flex;
   gap: 6px;
@@ -633,7 +685,7 @@ body.zoom-fit .card:hover {
 
 .declog-label-under {
   position: absolute;
-  top: 32px;
+  top: 42px;
   right: 6px;
   color: #d4aa00;
   font-weight: bold;
@@ -1027,6 +1079,24 @@ body.zoom-fit .card:hover {
   color: #fff;
 }
 
+/* Phase color swatches in legend */
+.legend-phase-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--border, #444);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.legend-phase-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
 /* ============================================================
    SLACK TICKET TICKER
    Only shown in kiosk mode via the .kiosk-mode body class.
@@ -1223,7 +1293,7 @@ body.zoom-fit .card:hover {
   white-space: nowrap;
   flex-shrink: 1;
   min-width: 0;
-  margin-left: 100px;
+  margin-left: 0;
 }
 
 #unracked-label {
@@ -1266,7 +1336,6 @@ body.zoom-fit .card:hover {
   border-radius: 4px;
   cursor: pointer;
   color: var(--text);
-  margin-left: auto;
   flex-shrink: 0;
 }
 
@@ -1283,10 +1352,22 @@ body.zoom-fit .card:hover {
 }
 
 @keyframes grid-flip-horizontal {
-  0%   { transform: perspective(1200px) rotateY(0deg);    opacity: 1; }
-  45%  { transform: perspective(1200px) rotateY(90deg);   opacity: 0; }
-  55%  { transform: perspective(1200px) rotateY(-90deg);  opacity: 0; }
-  100% { transform: perspective(1200px) rotateY(0deg);    opacity: 1; }
+  0% {
+    transform: perspective(1200px) rotateY(0deg);
+    opacity: 1;
+  }
+  45% {
+    transform: perspective(1200px) rotateY(90deg);
+    opacity: 0;
+  }
+  55% {
+    transform: perspective(1200px) rotateY(-90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: perspective(1200px) rotateY(0deg);
+    opacity: 1;
+  }
 }
 
 #kiosk-anim-wrap.flip-animating {
@@ -2269,7 +2350,8 @@ body.issues-mode:not(.kiosk-mode) .grid {
   max-width: 700px;
   width: calc(100% - 40px);
   color: #e7e9ea;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   text-align: left;
   box-sizing: border-box;
   display: flex;
@@ -2340,11 +2422,19 @@ body.kiosk-mode .ent-tweet-card {
   flex: 0 1 auto;
   min-height: 0;
 }
-.ent-tweet-img-1 { grid-template-columns: 1fr; }
+.ent-tweet-img-1 {
+  grid-template-columns: 1fr;
+}
 .ent-tweet-img-2,
-.ent-tweet-img-4 { grid-template-columns: 1fr 1fr; }
-.ent-tweet-img-3 { grid-template-columns: 1fr 1fr; }
-.ent-tweet-img-3 img:first-child { grid-column: 1 / -1; }
+.ent-tweet-img-4 {
+  grid-template-columns: 1fr 1fr;
+}
+.ent-tweet-img-3 {
+  grid-template-columns: 1fr 1fr;
+}
+.ent-tweet-img-3 img:first-child {
+  grid-column: 1 / -1;
+}
 .ent-tweet-images img {
   width: 100%;
   height: 260px;
@@ -2746,7 +2836,7 @@ body.kiosk-mode .ent-tweet-card {
 .uptime-proto {
   position: absolute;
   right: 30px;
-  top: 50px;
+  top: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2773,7 +2863,7 @@ body.kiosk-mode .ent-tweet-card {
 }
 
 .uptime-proto-num {
-  font-size: 9.5px;
+  font-size: 12px;
   font-weight: 700;
   fill: var(--text);
   font-family: inherit;
@@ -2801,7 +2891,7 @@ body.kiosk-mode .ent-tweet-card {
 }
 
 .uptime-proto.compact {
-  top: 42px;
+  top: 52px;
   right: 8px;
   gap: 0;
 }
