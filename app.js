@@ -3,7 +3,36 @@ const STALE_MS          = 2 * 60_000;
 const DRIVE_URL = () =>
   `https://www.googleapis.com/drive/v3/files/${VESSEL_STATE_FILE_ID}?alt=media&key=${GOOGLE_API_KEY}&ts=${Date.now()}`;
 
-let _currentData = null;
+let _currentData  = null;
+let _slotColors   = {};  // slotName → hex from vessel_state.json
+
+/* ── Phase segment classifier ───────────────────────────────────────────── */
+// Returns 0 (no phase), 1 (Biofirst), 2 (PFRP), 3 (Compost), or 4 (Dry Down)
+function _hexToPhaseSegments(hex) {
+  if (!hex) return 0;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const s = max === min ? 0 : l > 0.5
+    ? (max - min) / (2 - max - min)
+    : (max - min) / (max + min);
+  if (l > 0.88)              return 3;  // near-white  → Compost
+  if (s < 0.12 && l > 0.25) return 4;  // achromatic  → Dry Down
+  let h = 0;
+  const d = max - min;
+  if (max === r)      h = 60 * (((g - b) / d) % 6);
+  else if (max === g) h = 60 * ((b - r) / d + 2);
+  else                h = 60 * ((r - g) / d + 4);
+  if (h < 0) h += 360;
+  if (h >= 40 && h <= 80) return 1;  // yellow / amber  → Biofirst
+  if (h >= 10 && h <  40) return 2;  // orange / terracotta → PFRP
+  return 1;
+}
+
+const _PHASE_SEG_COLORS = ["#ffd966", "#f4a030", "#ffffff", "#999999"];
+const _PHASE_BG = "#1a1a2e";  // page background — blends empty segments away
 
 /* ── Fetch ─────────────────────────────────────────────────────────────── */
 async function fetchState() {
@@ -139,6 +168,15 @@ function makeCard(v) {
 
   card.appendChild(bubblesRow);
   card.appendChild(telem);
+
+  // Phase progress bar — set CSS custom properties driving ::after gradient
+  const _phaseSegs = _hexToPhaseSegments(_slotColors[v.id]);
+  card.style.borderBottomColor = _phaseSegs > 0 ? "transparent" : "";
+  card.style.setProperty("--ps1", _phaseSegs >= 1 ? _PHASE_SEG_COLORS[0] : _PHASE_BG);
+  card.style.setProperty("--ps2", _phaseSegs >= 2 ? _PHASE_SEG_COLORS[1] : _PHASE_BG);
+  card.style.setProperty("--ps3", _phaseSegs >= 3 ? _PHASE_SEG_COLORS[2] : _PHASE_BG);
+  card.style.setProperty("--ps4", _phaseSegs >= 4 ? _PHASE_SEG_COLORS[3] : _PHASE_BG);
+
   return card;
 }
 
@@ -232,6 +270,7 @@ function closeDetail() {
 /* ── Main render ─────────────────────────────────────────────────────────── */
 function render(data) {
   _currentData = data;
+  if (data.slotColors) _slotColors = data.slotColors;
   document.getElementById("status-message").classList.remove("visible");
   document.getElementById("grid").style.display = "";
   document.getElementById("fleet-summary").style.display = "";

@@ -86,6 +86,31 @@ body {
   cursor: pointer;
   transition: opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── Phase progress bar ──────────────────────────────────────────────────── */
+.vessel-card::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 2px;
+  right: 2px;
+  height: 5px;
+  border-radius: 0 0 5px 5px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    to right,
+    var(--ps1, #1a1a2e) 0%,              var(--ps1, #1a1a2e) calc(25% - 1px),
+    #1a1a2e            calc(25% - 1px), #1a1a2e            calc(25% + 1px),
+    var(--ps2, #1a1a2e) calc(25% + 1px), var(--ps2, #1a1a2e) calc(50% - 1px),
+    #1a1a2e            calc(50% - 1px), #1a1a2e            calc(50% + 1px),
+    var(--ps3, #1a1a2e) calc(50% + 1px), var(--ps3, #1a1a2e) calc(75% - 1px),
+    #1a1a2e            calc(75% - 1px), #1a1a2e            calc(75% + 1px),
+    var(--ps4, #1a1a2e) calc(75% + 1px), var(--ps4, #1a1a2e) 100%
+  );
 }
 .vessel-card:active { opacity: 0.7; }
 .vessel-card.issue-red    { background: #3a1e1e; border-color: #c00; }
