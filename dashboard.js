@@ -1435,7 +1435,7 @@ function updateCard(slotName, v) {
     _bar.style.cssText = "position:absolute;bottom:-3px;left:2px;right:2px;height:5px;display:flex;gap:2px;pointer-events:none;z-index:2;";
     for (let i = 0; i < 4; i++) {
       const _pill = document.createElement("div");
-      _pill.style.cssText = `flex:1;border-radius:3px;background:${i < _phaseSegs ? _PHASE_SEG_COLORS[i] : "var(--border)"};`;
+      _pill.style.cssText = `flex:1;border-radius:3px;background:${i < _phaseSegs ? _PHASE_SEG_COLORS[i] : "var(--bg)"};`;
       _bar.appendChild(_pill);
     }
     card.appendChild(_bar);
