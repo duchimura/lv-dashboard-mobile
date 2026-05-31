@@ -32,7 +32,7 @@ function _hexToPhaseSegments(hex) {
 }
 
 const _PHASE_SEG_COLORS = ["#ffd966", "#f4a030", "#ffffff", "#999999"];
-const _PHASE_EMPTY = "#333";  // matches card border — keeps all 4 slots readable
+const _PHASE_EMPTY = "#1a1a2e";  // matches page background — unfilled slots invisible
 
 /* ── Fetch ─────────────────────────────────────────────────────────────── */
 async function fetchState() {
