@@ -32,7 +32,7 @@ function _hexToPhaseSegments(hex) {
 }
 
 const _PHASE_SEG_COLORS = ["#ffd966", "#f4a030", "#ffffff", "#999999"];
-const _PHASE_BG = "#1a1a2e";  // page background — blends empty segments away
+const _PHASE_EMPTY = "#333";  // matches card border — keeps all 4 slots readable
 
 /* ── Fetch ─────────────────────────────────────────────────────────────── */
 async function fetchState() {
@@ -169,13 +169,21 @@ function makeCard(v) {
   card.appendChild(bubblesRow);
   card.appendChild(telem);
 
-  // Phase progress bar — set CSS custom properties driving ::after gradient
+  // Phase progress bar — 4 pill divs replacing the card's bottom border.
+  // Filled pills show the phase color; empty pills show #333 (card border color).
   const _phaseSegs = _hexToPhaseSegments(_slotColors[v.id]);
   card.style.borderBottomColor = _phaseSegs > 0 ? "transparent" : "";
-  card.style.setProperty("--ps1", _phaseSegs >= 1 ? _PHASE_SEG_COLORS[0] : _PHASE_BG);
-  card.style.setProperty("--ps2", _phaseSegs >= 2 ? _PHASE_SEG_COLORS[1] : _PHASE_BG);
-  card.style.setProperty("--ps3", _phaseSegs >= 3 ? _PHASE_SEG_COLORS[2] : _PHASE_BG);
-  card.style.setProperty("--ps4", _phaseSegs >= 4 ? _PHASE_SEG_COLORS[3] : _PHASE_BG);
+  if (_phaseSegs > 0) {
+    const _bar = document.createElement("div");
+    _bar.className = "phase-bar";
+    _bar.style.cssText = "position:absolute;bottom:-3px;left:2px;right:2px;height:5px;display:flex;gap:2px;pointer-events:none;z-index:2;";
+    for (let i = 0; i < 4; i++) {
+      const _pill = document.createElement("div");
+      _pill.style.cssText = `flex:1;border-radius:3px;background:${i < _phaseSegs ? _PHASE_SEG_COLORS[i] : _PHASE_EMPTY};`;
+      _bar.appendChild(_pill);
+    }
+    card.appendChild(_bar);
+  }
 
   return card;
 }

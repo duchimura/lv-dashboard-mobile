@@ -1415,26 +1415,31 @@ function updateCard(slotName, v) {
   }
   // ════════════════════════════════════════════════════════════════════════════
 
-  // PHASE PROGRESS BAR — 4 equal segments at card bottom.
-  // Each segment has a fixed phase color; segments fill left-to-right as the
-  // vessel advances through the lifecycle.  The spreadsheet hex determines how
-  // many segments are lit; each lit segment shows its OWN phase color.
-  //   seg 1 = Biofirst (yellow)
-  //   seg 2 = PFRP     (orange)
-  //   seg 3 = Compost  (white)
-  //   seg 4 = Dry Down (gray)
+  // PHASE PROGRESS BAR — 4 pill segments below the card bottom border.
+  // Filled pills show the phase color; empty pills show the card border color
+  // so all 4 segments are always visible as a dim track.
+  //   seg 1 = Biofirst (yellow)   seg 2 = PFRP (orange)
+  //   seg 3 = Compost  (white)    seg 4 = Dry Down (gray)
   const _PHASE_SEG_COLORS = ["#ffd966", "#f4a030", "#ffffff", "#999999"];
   card.style.background = ""; // clear any legacy card tint
   const _phaseHex  = slotColors[slotName];
   const _phaseSegs = _hexToPhaseSegments(_phaseHex);
-  const _emptyCol  = "var(--bg)"; // matches page/grid background → makes unfilled sections invisible
-  // Hide the card's own border-bottom when a phase bar is present so the 1px
-  // border line doesn't bleed through the empty segments at the card corners.
+
+  // Remove stale bar from previous render cycle
+  card.querySelector(".phase-bar")?.remove();
+
   card.style.borderBottomColor = _phaseSegs > 0 ? "transparent" : "";
-  card.style.setProperty("--ps1", _phaseSegs >= 1 ? _PHASE_SEG_COLORS[0] : _emptyCol);
-  card.style.setProperty("--ps2", _phaseSegs >= 2 ? _PHASE_SEG_COLORS[1] : _emptyCol);
-  card.style.setProperty("--ps3", _phaseSegs >= 3 ? _PHASE_SEG_COLORS[2] : _emptyCol);
-  card.style.setProperty("--ps4", _phaseSegs >= 4 ? _PHASE_SEG_COLORS[3] : _emptyCol);
+  if (_phaseSegs > 0) {
+    const _bar = document.createElement("div");
+    _bar.className = "phase-bar";
+    _bar.style.cssText = "position:absolute;bottom:-3px;left:2px;right:2px;height:5px;display:flex;gap:2px;pointer-events:none;z-index:2;";
+    for (let i = 0; i < 4; i++) {
+      const _pill = document.createElement("div");
+      _pill.style.cssText = `flex:1;border-radius:3px;background:${i < _phaseSegs ? _PHASE_SEG_COLORS[i] : "var(--border)"};`;
+      _bar.appendChild(_pill);
+    }
+    card.appendChild(_bar);
+  }
 
   // Ensure name badge is unstyled (no leftover pill coloring)
   if (_nameBadge) {

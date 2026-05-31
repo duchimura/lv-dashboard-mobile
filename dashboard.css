@@ -497,31 +497,10 @@ body.zoom-fit {
     box-shadow 0.2s ease;
 }
 
-/* Phase progress bar — 4 equal segments at card bottom.
-   bottom: -1px so the element overlaps the card's 1px border-bottom,
-   letting var(--bg) segments visually erase that portion of the border.
-   --ps1..--ps4 are set by JS: phase color when filled, var(--bg) when empty. */
-.card::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 2px;
-  right: 2px;
-  height: 5px;
-  border-radius: 0 0 5px 5px;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(
-    to right,
-    var(--ps1, var(--bg)) 0%,              var(--ps1, var(--bg)) calc(25% - 1px),
-    var(--bg)             calc(25% - 1px), var(--bg)             calc(25% + 1px),
-    var(--ps2, var(--bg)) calc(25% + 1px), var(--ps2, var(--bg)) calc(50% - 1px),
-    var(--bg)             calc(50% - 1px), var(--bg)             calc(50% + 1px),
-    var(--ps3, var(--bg)) calc(50% + 1px), var(--ps3, var(--bg)) calc(75% - 1px),
-    var(--bg)             calc(75% - 1px), var(--bg)             calc(75% + 1px),
-    var(--ps4, var(--bg)) calc(75% + 1px), var(--ps4, var(--bg)) 100%
-  );
-}
+/* Phase progress bar — 4 pill segments injected by JS (.phase-bar div).
+   Pills sit just below the card bottom (border-bottom set transparent by JS).
+   Filled pills show the phase color; empty pills show var(--border) so the
+   4-segment structure is always readable against the card grid. */
 
 /* Top-3 issue cards — teal border + subtle teal background tint */
 .card.top-issue-card {

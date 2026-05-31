@@ -87,31 +87,11 @@ body {
   transition: opacity 0.15s;
   -webkit-tap-highlight-color: transparent;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
-
-/* ── Phase progress bar ──────────────────────────────────────────────────── */
-.vessel-card::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 2px;
-  right: 2px;
-  height: 5px;
-  border-radius: 0 0 5px 5px;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(
-    to right,
-    var(--ps1, #1a1a2e) 0%,              var(--ps1, #1a1a2e) calc(25% - 1px),
-    #1a1a2e            calc(25% - 1px), #1a1a2e            calc(25% + 1px),
-    var(--ps2, #1a1a2e) calc(25% + 1px), var(--ps2, #1a1a2e) calc(50% - 1px),
-    #1a1a2e            calc(50% - 1px), #1a1a2e            calc(50% + 1px),
-    var(--ps3, #1a1a2e) calc(50% + 1px), var(--ps3, #1a1a2e) calc(75% - 1px),
-    #1a1a2e            calc(75% - 1px), #1a1a2e            calc(75% + 1px),
-    var(--ps4, #1a1a2e) calc(75% + 1px), var(--ps4, #1a1a2e) 100%
-  );
-}
+/* Phase progress bar — 4 pill divs injected by JS (.phase-bar).
+   Pills sit just below the card (border-bottom transparent when present).
+   Empty pills use #333 (matches card border) so all 4 slots stay readable. */
 .vessel-card:active { opacity: 0.7; }
 .vessel-card.issue-red    { background: #3a1e1e; border-color: #c00; }
 .vessel-card.issue-orange { background: #2a2a1e; border-color: #ff8800; }
