@@ -59,6 +59,64 @@ body {
 .fleet-chip.off      { background: #222; }
 .fleet-chip.off .count     { color: #888; }
 
+/* ── Watchdog control bar ────────────────────────────────────────────────── */
+#watchdog-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #0a0f1e;
+  border-bottom: 1px solid #1e293b;
+  gap: 8px;
+}
+#watchdog-status { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+.wd-badge {
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  display: inline-block;
+}
+.wd-badge.on  { background: #1e3a1e; color: #4ade80; }
+.wd-badge.off { background: #3a1e1e; color: #f87171; }
+#watchdog-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.wd-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.wd-btn:active { opacity: 0.7; }
+.wd-btn.pause   { background: #f59e0b; color: #000; }
+.wd-btn.restart { background: #22c55e; color: #000; }
+#watchdog-msg {
+  display: none;
+  font-size: 11px;
+  padding: 4px 12px;
+  text-align: center;
+  background: #0a0f1e;
+  border-bottom: 1px solid #1e293b;
+}
+#watchdog-msg.visible     { display: block; color: #94a3b8; }
+#watchdog-msg.visible.ok  { color: #4ade80; }
+#watchdog-msg.visible.err { color: #f87171; }
+#watchdog-conf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #0a0f1e;
+  border-bottom: 1px solid #1e293b;
+  gap: 8px;
+}
+#wdconf-label { font-size: 11px; color: #f1f5f9; flex: 1; }
+#wdconf-btns  { display: flex; gap: 6px; flex-shrink: 0; }
+.wd-btn.cancel  { background: #334155; color: #cbd5e1; }
+.wd-btn.confirm { background: #0ea5e9; color: #000; }
+
 /* ── Rack sections ───────────────────────────────────────────────────────── */
 #grid { padding: 0 8px 80px; }
 .rack-section { margin-bottom: 12px; }
