@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "3333", "."],
+      "port": 3333
+    },
+    {
+      "name": "mobile-app",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "3334", "mobile-app"],
+      "port": 3334
+    }
+  ]
+}

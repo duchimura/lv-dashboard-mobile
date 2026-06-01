@@ -60,6 +60,8 @@ const _watchdogMotorRetry     = new Map(); // slotName → timestamp of first at
 const _watchdogMotorFailCount = new Map(); // slotName → exhausted retry cycle count
 const _watchdogRackResetAt    = new Map(); // slotName → timestamp of last rack reset
 const _pendingMotorLog        = new Map(); // slotName → row pending motor-running confirmation
+const _pendingTempLog         = new Map(); // slotName → row pending temp-on confirmation
+const _pendingBlowerLog       = new Map(); // slotName → row pending blower-on confirmation
 const _watchdogValveFaultActive = new Map(); // slotName → true while valve fault is active; cleared when fault resolves
 const RACK_RESET_THRESHOLD    = 3;         // exhausted retry cycles before rack reset
 
@@ -227,18 +229,18 @@ function _scheduleMobileSnapshot() {
 const injectedTabs = new Set();
 let lastWsMessage = Date.now();
 
-/************************************************************
- * SERVICE WORKER KEEP-ALIVE
- *
- * MV3 service workers suspend after ~30 s of inactivity. Any
- * in-flight async operation that spans a suspension boundary
- * silently drops the message port ("message port closed before
- * a response was received"). Holding an open chrome.runtime
- * connect port prevents suspension for the duration.
- *
- * dashboard.js opens a "keepAlive" port before each automation
- * and disconnects it once the response arrives.
- ************************************************************/
+// ============================================================
+// SERVICE WORKER KEEP-ALIVE
+//
+// MV3 service workers suspend after ~30 s of inactivity. Any
+// in-flight async operation that spans a suspension boundary
+// silently drops the message port ("message port closed before
+// a response was received"). Holding an open chrome.runtime
+// connect port prevents suspension for the duration.
+//
+// dashboard.js opens a "keepAlive" port before each automation
+// and disconnects it once the response arrives.
+// ============================================================
 const keepAlivePorts = new Set();
 
 chrome.runtime.onConnect.addListener((port) => {
@@ -915,63 +917,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === "pause-all-racks") {
-    (async () => {
-      // Always disable watchdog — must happen even when triggered from a non-kiosk
-      // PC (no HMI tab here). Drive sync propagates the disabled state to the kiosk.
-      // Watchdog is restarted manually only.
-      const time = new Date().toLocaleTimeString("en-US", { hour12: false });
-      const disabledState = {
-        enabled: false,
-        changedBy: "pause-all",
-        ownedBy: null,
-        time,
-        changedAt: Date.now(),
-      };
-      await new Promise(resolve => {
-        chrome.storage.local.get(["watchdog_log"], ({ watchdog_log = [] }) => {
-          const entry = { time, type: "toggle", action: "Disabled", by: "Pause All Racks", ts: Date.now() };
-          const log = [entry, ...watchdog_log].slice(0, 100);
-          chrome.storage.local.set({ watchdog_state: disabledState, watchdog_log: log }, resolve);
-        });
-      });
-      _driveLastKnownAt = disabledState.changedAt;
-      writeDriveState(disabledState).catch(e => _log("⚠️ [DRIVE SYNC] Write failed:", e.message));
-      _log("🤖 Watchdog DISABLED by pause-all-racks");
+    (async () => { sendResponse(await _executePauseAll()); })();
+    return true;
+  }
 
-      const tabs = await chrome.tabs.query({});
-      const hmiTab = tabs.find((t) => t.url?.includes("/internal/hmi/"));
-      if (!hmiTab) {
-        console.warn("❌ pause-all-racks — HMI tab not found");
-        sendResponse({ ok: false, error: "HMI tab not found" });
-        return;
-      }
+  if (msg.type === "reset-slot-v2") {
+    const { slotName, vesselId } = msg;
+    (async () => {
       try {
-        const results = await chrome.scripting.executeScript({
-          target: { tabId: hmiTab.id },
-          world: "MAIN",
-          func: () => {
-            const groups = document.querySelectorAll(
-              "#vessels_hall_view .hmi_vessels_view__content__rack_groups > div",
-            );
-            let clicked = 0;
-            for (const group of groups) {
-              const btn = group.querySelector(
-                ".hmi_vessels_view__content__rack_groups__group__footer div > a",
-              );
-              if (btn) {
-                btn.click();
-                clicked++;
-              }
-            }
-            return clicked;
-          },
-        });
-        const clicked = results?.[0]?.result ?? 0;
-        _log(`✅ pause-all-racks — clicked ${clicked} rack pause buttons`);
-        setTimeout(syncRackPauseState, 800);
-        sendResponse({ ok: true, clicked });
+        const res = await _checkV2SlotCardReset(slotName, vesselId);
+        _log(`✅ reset-slot-v2 ${slotName}: ${res}`);
+        sendResponse({ ok: true, res });
       } catch (err) {
-        console.error("❌ pause-all-racks error:", err.message);
+        console.error(`❌ reset-slot-v2 ${slotName}:`, err.message);
         sendResponse({ ok: false, error: err.message });
       }
     })();
@@ -1664,14 +1622,14 @@ chrome.action.onClicked.addListener(() => {
   setInterval(refreshRackState, 30000);
 })().catch((e) => _log("⚠️ startup init error:", e));
 
-/************************************************************
- * RACK STATE REFRESH  (vessel presence — runs every 2 min)
- *
- * Re-fetches rack-groups + vessels from the API and updates
- * vesselPresent (plus related fields) for every slot.
- * When a vessel is removed the slot's stale telemetry and
- * setpoints are cleared and a dashboard:update is broadcast.
- ************************************************************/
+// ============================================================
+// RACK STATE REFRESH  (vessel presence — runs every 2 min)
+//
+// Re-fetches rack-groups + vessels from the API and updates
+// vesselPresent (plus related fields) for every slot.
+// When a vessel is removed the slot's stale telemetry and
+// setpoints are cleared and a dashboard:update is broadcast.
+// ============================================================
 async function refreshRackState() {
   try {
     const [rackGroupsResult, vesselsResult] = await Promise.allSettled([
@@ -2151,18 +2109,18 @@ async function collectBlowerSetpointsFromHmi() {
   _blowerSpScrapeRunning = false;
 }
 
-/************************************************************
- * SILENT SETPOINT WRITE  (via stored WS socket reference)
- *
- * Injects a tiny script into the HMI tab's MAIN world that
- * calls window.__WS_SOCKET__.send() with the command JSON.
- * No tab focus switch, no card opening — completely invisible.
- *
- * Command formats (confirmed from WS tap):
- *   temp   → { type:"temperature", value:{ set_temp:<°C> },   id:<uuid>, vessel_id:<n> }
- *   motor  → { type:"motor",       value:{ set_rotations_hr:<n> }, id:<uuid>, vessel_id:<n> }
- *   blower → { type:"air",         value:{ set_air:<n> },     id:<uuid>, vessel_id:<n> }
- ************************************************************/
+// ============================================================
+// SILENT SETPOINT WRITE  (via stored WS socket reference)
+//
+// Injects a tiny script into the HMI tab's MAIN world that
+// calls window.__WS_SOCKET__.send() with the command JSON.
+// No tab focus switch, no card opening — completely invisible.
+//
+// Command formats (confirmed from WS tap):
+//   temp   → { type:"temperature", value:{ set_temp:<°C> },   id:<uuid>, vessel_id:<n> }
+//   motor  → { type:"motor",       value:{ set_rotations_hr:<n> }, id:<uuid>, vessel_id:<n> }
+//   blower → { type:"air",         value:{ set_air:<n> },     id:<uuid>, vessel_id:<n> }
+// ============================================================
 async function sendWsSetpoint(hmiTabId, vesselId, spType, value) {
   let command;
 
@@ -2704,12 +2662,11 @@ async function _resetRackForSlot(slotName, vesselId) {
 }
 
 // ============================================================
-// Opens a silent popup to the HMI v2 vessel detail page (/v2/ URL) and checks
-// the state of the direct reset button in the slot card. Returns:
-//   "clicked"   — button found in active (fault/reset) state and clicked
-//   "park-stop" — button found but in park/park-stop state (motor is parked)
-//   "not-found" — button absent after 15 s (not on v2 HMI or page error)
-async function _checkV2SlotCardReset(slotName, vesselId) {
+// Opens a silent background tab to the HMI v2 vessel detail page and clicks the
+// park-stop button if the motor is currently running (button label includes "park").
+// Used by pause-all-racks when slot A is empty and the hall-view footer button is absent.
+// Returns: "parked" | "already-stopped" | "not-found"
+async function _parkStopSlotV2(slotName, vesselId) {
   const vesselUrl = `https://atlas.earthfuneral.com/internal/hmi/v2/vessels/${vesselId}/details`;
   const BTN_SELECTOR =
     "div.vessel-details__content > div:nth-child(3) > " +
@@ -2730,26 +2687,109 @@ async function _checkV2SlotCardReset(slotName, vesselId) {
           const btn = document.querySelector(sel);
           if (!btn) return { found: false };
           const label = (btn.getAttribute("aria-label") || btn.textContent || "").trim();
-          if (label.toLowerCase().includes("park"))
-            return { found: true, parkStop: true, label };
-          if (btn.disabled)
-            return { found: true, notActive: true, label };
-          btn.click();
-          return { found: true, parkStop: false, label };
+          if (label.toLowerCase().includes("park")) {
+            btn.click();
+            return { found: true, clicked: true, label };
+          }
+          return { found: true, clicked: false, label };
         },
         args: [BTN_SELECTOR],
       });
       const r = results?.[0]?.result;
       if (r?.found) {
-        if (r.parkStop) {
-          _log(`⚠️ [WATCHDOG] ${slotName} v2 slot card reset in park-stop state ("${r.label}")`);
-          return "park-stop";
+        if (r.clicked) {
+          _log(`✅ [PAUSE-ALL] ${slotName} park-stop clicked ("${r.label}")`);
+          return "parked";
         }
-        if (r.notActive) {
-          _log(`🟡 [WATCHDOG] ${slotName} v2 slot card reset button found but not active ("${r.label}")`);
-          return "not-active";
-        }
-        _log(`✅ [WATCHDOG] ${slotName} v2 slot card reset clicked ("${r.label}")`);
+        _log(`🟡 [PAUSE-ALL] ${slotName} park-stop btn found but not in park state ("${r.label}") — already stopped`);
+        return "already-stopped";
+      }
+    }
+    _log(`⚠️ [PAUSE-ALL] ${slotName} park-stop btn not found after 15s`);
+    return "not-found";
+  } catch (err) {
+    _log(`❌ [PAUSE-ALL] ${slotName} _parkStopSlotV2 error: ${err.message}`);
+    return "not-found";
+  } finally {
+    if (bgTab?.id) {
+      try { await chrome.tabs.remove(bgTab.id); } catch (_) {}
+    }
+  }
+}
+
+// Opens a silent popup to the HMI v2 vessel detail page (/v2/ URL) and checks
+// the state of the direct reset button in the slot card. Returns:
+//   "clicked"   — button found in active (fault/reset) state and clicked
+//   "park-stop" — button found but in park/park-stop state (motor is parked)
+//   "not-found" — button absent after 15 s (not on v2 HMI or page error)
+// Returns one of:
+//   "clicked"           – reset button was active, clicked it (caller sends motor SP)
+//   "sp-sent"           – park-stop: SP field ≠ desired, injected desired SP into v2 field
+//   "sp-nudged"         – park-stop: SP field = desired, injected SP-1 then desired SP
+//   "not-active"        – button found but disabled (caller falls through to WS sequence)
+//   "not-found"         – button never appeared (caller falls through to WS sequence)
+//
+// hmiTabId and desiredMotorSp are only needed for the park-stop SP-injection path.
+// When called from the valve-fault handler (motor running), pass null for both.
+async function _checkV2SlotCardReset(slotName, vesselId, hmiTabId = null, desiredMotorSp = null) {
+  const vesselUrl = `https://atlas.earthfuneral.com/internal/hmi/v2/vessels/${vesselId}/details`;
+  const BTN_SELECTOR =
+    "div.vessel-details__content > div:nth-child(3) > " +
+    "div:nth-child(10) > div:nth-child(3) > div > button";
+  // Motor SP input field — in the same motor section as the reset button.
+  // Analogous to the blower SP selector (div:nth-child(5) → div:nth-child(3) for motor).
+  // Update if the v2 DOM structure changes.
+  const MOTOR_SP_SELECTOR =
+    "div.vessel-details__content > div:nth-child(3) > " +
+    "div:nth-child(10) > div:nth-child(3) > div > div > input";
+
+  let bgTab = null;
+  try {
+    bgTab = await chrome.tabs.create({ url: vesselUrl, active: false });
+    const tabId = bgTab.id;
+    if (!tabId) throw new Error("No tab ID from background tab");
+
+    // Up to 2 passes — second pass runs after a valve-fault clear + tab reload.
+    for (let pass = 0; pass < 2; pass++) {
+      let btnResult = null;
+
+      // Poll for the button (15 s / 30 × 500 ms).
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          world: "MAIN",
+          func: (btnSel, spSel) => {
+            const btn = document.querySelector(btnSel);
+            if (!btn) return { found: false };
+            const label = (btn.getAttribute("aria-label") || btn.textContent || "").trim();
+            const spInput = document.querySelector(spSel);
+            const spVal   = spInput ? parseFloat(spInput.value) : null;
+            if (label.toLowerCase().includes("park"))
+              return { found: true, parkStop: true, label, spVal };
+            if (btn.disabled)
+              return { found: true, notActive: true, label };
+            btn.click();
+            return { found: true, clicked: true, label };
+          },
+          args: [BTN_SELECTOR, MOTOR_SP_SELECTOR],
+        });
+        btnResult = results?.[0]?.result;
+        if (btnResult?.found) break;
+      }
+
+      if (!btnResult?.found) {
+        _log(`🔄 [WATCHDOG] ${slotName} v2 slot card reset button not found after 15 s (pass ${pass + 1})`);
+        return "not-found";
+      }
+
+      if (btnResult.notActive) {
+        _log(`🟡 [WATCHDOG] ${slotName} v2 slot card reset button found but not active ("${btnResult.label}")`);
+        return "not-active";
+      }
+
+      if (btnResult.clicked) {
+        _log(`✅ [WATCHDOG] ${slotName} v2 slot card reset clicked ("${btnResult.label}")`);
         await new Promise((r) => setTimeout(r, 1000));
         await chrome.scripting.executeScript({
           target: { tabId },
@@ -2766,9 +2806,82 @@ async function _checkV2SlotCardReset(slotName, vesselId) {
         });
         return "clicked";
       }
+
+      // Park-stop state.
+      _log(`⚠️ [WATCHDOG] ${slotName} v2 slot card reset in park-stop state ("${btnResult.label}")`);
+
+      // Without desiredMotorSp the caller handles this (e.g. valve-fault path).
+      if (desiredMotorSp == null) return "park-stop";
+
+      // Determine what SP to inject first.
+      const nudgeSp  = desiredMotorSp > 1 ? desiredMotorSp - 1 : desiredMotorSp + 1;
+      const spField  = typeof btnResult.spVal === "number" && !isNaN(btnResult.spVal) ? btnResult.spVal : null;
+      const needNudge = spField !== null && spField === desiredMotorSp;
+
+      if (needNudge) {
+        _log(`🟡 [WATCHDOG] ${slotName} park-stop SP field = ${spField} (already desired) — nudging to ${nudgeSp} then ${desiredMotorSp}`);
+      } else {
+        _log(`🟡 [WATCHDOG] ${slotName} park-stop SP field = ${spField ?? "n/a"} — injecting ${desiredMotorSp} R/hr`);
+      }
+
+      // Inject via React-compatible DOM fill (mirrors typing in the v2 field + Enter).
+      const injectSp = async (targetTabId, sp) => {
+        await chrome.scripting.executeScript({
+          target: { tabId: targetTabId },
+          world: "MAIN",
+          func: (sel, val) => {
+            const input = document.querySelector(sel);
+            if (!input) return false;
+            const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+            setter.call(input, String(val));
+            input.dispatchEvent(new Event("input",  { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", keyCode: 13, bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent("keyup",   { key: "Enter", keyCode: 13, bubbles: true }));
+            return true;
+          },
+          args: [MOTOR_SP_SELECTOR, sp],
+        });
+        // Also send via WS as backup — belt-and-suspenders.
+        if (hmiTabId != null) {
+          try {
+            await sendWsSetpoint(hmiTabId, vesselId, "motor", sp);
+          } catch (_) {}
+        }
+      };
+
+      if (needNudge) {
+        await injectSp(tabId, nudgeSp);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      await injectSp(tabId, desiredMotorSp);
+
+      // Give the HMI a moment to react before checking valve-fault state.
+      await new Promise((r) => setTimeout(r, 1500));
+
+      const valveFaultNow = dashboardState[slotName]?.valveModuleStatus === "VALVE_FAULT";
+      if (valveFaultNow && pass === 0) {
+        _log(`⚠️ [WATCHDOG] ${slotName} valve fault detected after SP inject — running v1 fault reset, then re-checking`);
+        const resetClicked = await _clickMotorResetButton(slotName, vesselId);
+        if (!resetClicked) {
+          await _clickVesselResetLink(slotName, vesselId);
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        // Reload the tab and run the detection loop a second time.
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          world: "MAIN",
+          func: () => location.reload(),
+          args: [],
+        });
+        await new Promise((r) => setTimeout(r, 3000));
+        continue; // second pass
+      }
+
+      return needNudge ? "sp-nudged" : "sp-sent";
     }
-    _log(`🔄 [WATCHDOG] ${slotName} v2 slot card reset button not found after 15 s`);
-    return "not-found";
+
+    return "sp-sent"; // reached only after second pass
   } catch (err) {
     _log(`❌ [WATCHDOG] ${slotName} v2 slot card reset error: ${err.message}`);
     return "not-found";
@@ -2788,6 +2901,15 @@ async function _checkV2SlotCardReset(slotName, vesselId) {
 // ============================================================
 
 async function _watchdogTick() {
+  // Pull the latest Drive state before acting — catches disable commands written
+  // by non-kiosk PCs before the 1-min alarm has a chance to propagate them.
+  await _drivePoll().catch(() => {});
+  const _latestWdState = await new Promise(r => chrome.storage.local.get(["watchdog_state"], r));
+  if (!_latestWdState?.watchdog_state?.enabled) {
+    _log("🤖 [WATCHDOG] Tick aborted — disabled state confirmed via Drive sync");
+    return;
+  }
+
   const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
   const _tickNow = new Date();
   const _tickDate = _tickNow.toLocaleDateString("en-US", { year: "numeric", month: "2-digit", day: "2-digit" });
@@ -2805,6 +2927,37 @@ async function _watchdogTick() {
     const confirmed = ms === "MIXER_RUNNING" || ms === "MIXER_MIXING" || ms === "ON";
     if (confirmed) {
       _confirmedMotorRows.push(pending);
+    }
+  }
+
+  // Confirm pending temp setpoints from the previous tick.
+  // Only logged to the spreadsheet if tempControlOn is now true; drop otherwise.
+  for (const [slotName, pending] of _pendingTempLog) {
+    _pendingTempLog.delete(slotName);
+    const v = dashboardState[slotName];
+    if (!v?.vesselPresent) continue;
+    if (v.tempControlOn === true) {
+      _spLogRows.push(pending);
+    } else {
+      _log(`⏳ [WATCHDOG] ${slotName} temp ctrl not yet confirmed on — dropping log row`);
+    }
+  }
+
+  // Confirm pending blower setpoints from the previous tick.
+  // Only logged to the spreadsheet if the blower is now confirmed on; drop otherwise.
+  for (const [slotName, pending] of _pendingBlowerLog) {
+    _pendingBlowerLog.delete(slotName);
+    const v = dashboardState[slotName];
+    if (!v?.vesselPresent) continue;
+    const _bt = v.telemetry || {};
+    const _bf = typeof _bt.airflow === "number" ? _bt.airflow : null;
+    const blowerNowOn = (v.valveModuleStatus || "").toUpperCase() === "ON" ||
+                        (_bf ?? 0) > 0 ||
+                        (v.lastAirflowPositiveAt ?? 0) > Date.now() - 3 * 60_000;
+    if (blowerNowOn) {
+      _spLogRows.push(pending);
+    } else {
+      _log(`⏳ [WATCHDOG] ${slotName} blower not yet confirmed on — dropping log row`);
     }
   }
 
@@ -2840,6 +2993,14 @@ async function _watchdogTick() {
     const waitVessel = (v.mechanicalStatus || "").toLowerCase() === "wait_vessel";
     if (powerInactive || waitVessel) continue;
 
+    // Compute motor action need early so skip logic can use it.
+    // MIXER_STOPPED / MIXER_FAULTED / VALVE_FAULT all require watchdog intervention
+    // regardless of rack pause state — an unexpected hardware stop takes priority.
+    const _earlyMixerUpper = (v.mixerModuleStatus || "").toUpperCase();
+    const _motorNeedsAction = _earlyMixerUpper === "MIXER_STOPPED" ||
+                              _earlyMixerUpper === "MIXER_FAULTED" ||
+                              v.valveModuleStatus === "VALVE_FAULT";
+
     // ctrl_inactive = motor control disabled by HMI; may be recoverable.
     // Only skip if the rack group is also deliberately paused (A slot occupied),
     // which confirms an operator intentionally stopped this slot.
@@ -2865,7 +3026,10 @@ async function _watchdogTick() {
     // A slot showing wait_vessel (even combined with a faulted status) is physically
     // empty; the HMI activates "reset rack" automatically in that state, so it is
     // NOT a manual pause and B/C slots still need watchdog care.
-    if (v.rackGroupPaused === true) {
+    // Exception: when the motor is stopped or faulted the skip is bypassed — an
+    // unexpected hardware stop must be addressed even if the HMI shows "reset rack"
+    // (e.g. the stop itself caused the HMI to surface the reset button for that column).
+    if (v.rackGroupPaused === true && !_motorNeedsAction) {
       const aSlotName = slotName.replace(/[A-Z]$/, "A");
       const aSlot = dashboardState[aSlotName];
       const aWaitVessel = (aSlot?.mechanicalStatus || "").toLowerCase() === "wait_vessel";
@@ -3037,14 +3201,15 @@ async function _watchdogTick() {
 
     // ── 2. MOTOR STOPPED unexpectedly (no fault) ─────────────────────────
     // Check HMI v2 reset button first (primary path):
-    //   "clicked"    → v2 button was active, clicked it → send motor SP and done.
-    //   "park-stop"  → motor is parked in v2; trigger HMI v1 rack reset → send motor SP.
-    //   "not-active" → button found but disabled; send motor SP as step 1, escalate next tick.
-    //   "not-found"  → fall through to WS setpoint retry sequence.
+    //   "clicked"    → reset button was active, clicked it → send motor SP via WS.
+    //   "sp-sent"    → park-stop: SP field ≠ desired, v2 field injected + WS backup sent.
+    //   "sp-nudged"  → park-stop: SP field = desired, nudge (SP-1) + desired injected.
+    //   "not-active" → button found but disabled → fall through to WS retry sequence.
+    //   "not-found"  → button never appeared → fall through to WS retry sequence.
     if (motorStopped && vesselId != null) {
       actionsFound++;
 
-      const v2Result = await _checkV2SlotCardReset(slotName, vesselId);
+      const v2Result = await _checkV2SlotCardReset(slotName, vesselId, hmiTab.id, desiredMotorSp);
 
       if (v2Result === "clicked") {
         _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — v2 reset clicked, sending motor SP`);
@@ -3060,95 +3225,70 @@ async function _watchdogTick() {
         continue;
       }
 
-      if (v2Result === "park-stop") {
-        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — v2 btn park-stop, triggering HMI v1 rack reset`);
-        _watchdogMotorRetry.delete(slotName);
-        _watchdogMotorFailCount.delete(slotName);
+      if (v2Result === "sp-sent" || v2Result === "sp-nudged") {
+        const note = v2Result === "sp-nudged" ? `park-stop nudge ${faultMotorSp}→${desiredMotorSp}` : `park-stop SP ${desiredMotorSp}`;
+        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — ${note} injected via v2 field — confirming next tick`);
+        _watchdogMotorRetry.set(slotName, Date.now());
+        _watchdogMotorFailCount.set(slotName, (_watchdogMotorFailCount.get(slotName) ?? 0) + 1);
+        _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, note, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
+        continue;
+      }
+
+      // v2 button not clicked / not usable — send fault-reset + dual setpoint every attempt.
+      //
+      // Why not "try a plain SP first, then escalate"?
+      //   • When a motor stops the HMI SP field still holds the last running value
+      //     (e.g. 60 R/hr).  Sending the same value is a no-op — the HMI sees no
+      //     change and ignores the command.
+      //   • The old two-step escalation (plain SP on tick N, fault-reset on tick N+1)
+      //     depended on _watchdogMotorRetry surviving across ticks.  That Map is
+      //     in-memory; Chrome kills the service worker after ~30 s of inactivity and
+      //     the Map is wiped, so the escalation to fault-reset never happened.
+      //
+      // Fix: fault-reset + offset trick (faultMotorSp → desiredMotorSp) on every tick.
+      //   • fault-reset clears the stopped/inactive state in the HMI motor module.
+      //   • Sending faultMotorSp (SP ± 1) forces the field to accept a new value.
+      //   • Sending desiredMotorSp immediately after restores the correct setpoint.
+      // This sequence is safe to repeat — it is idempotent for a running motor and
+      // effective for a stopped one regardless of how long it has been down.
+      _watchdogMotorRetry.set(slotName, Date.now());
+      const failCount = (_watchdogMotorFailCount.get(slotName) ?? 0) + 1;
+      _watchdogMotorFailCount.set(slotName, failCount);
+      _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — fault-reset + speed ${faultMotorSp}→${desiredMotorSp} R/hr (v2: ${v2Result}, attempt ${failCount})`);
+      try {
+        await sendWsSetpoint(hmiTab.id, vesselId, "fault-reset", 1);
+        _log(`✅ [WATCHDOG] ${slotName} fault-reset sent`);
+        await new Promise((r) => setTimeout(r, 1500));
+        await sendWsSetpoint(hmiTab.id, vesselId, "motor", faultMotorSp);
+        _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${faultMotorSp} R/hr (unlock)`);
+        await new Promise((r) => setTimeout(r, 500));
+        await sendWsSetpoint(hmiTab.id, vesselId, "motor", desiredMotorSp);
+        _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${desiredMotorSp} R/hr`);
+        _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, note: `v2:${v2Result}`, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
+      } catch (err) {
+        _log(`❌ [WATCHDOG] ${slotName} motor restart error: ${err.message}`);
+      }
+      if (failCount >= RACK_RESET_THRESHOLD) {
         const lastReset = _watchdogRackResetAt.get(slotName) ?? 0;
         if (Date.now() - lastReset > RACK_RESET_COOLDOWN_MS) {
           _watchdogRackResetAt.set(slotName, Date.now());
+          _watchdogMotorFailCount.delete(slotName);
           await _resetRackForSlot(slotName, vesselId);
-          try {
-            await sendWsSetpoint(hmiTab.id, vesselId, "motor", desiredMotorSp);
-            _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${desiredMotorSp} R/hr`);
-            _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, note: "v1 rack reset", envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
-          } catch (err) {
-            _log(`❌ [WATCHDOG] ${slotName} motor restart error after rack reset: ${err.message}`);
-          }
         } else {
           const secsAgo = Math.round((Date.now() - lastReset) / 1000);
           _log(`⏳ [WATCHDOG] ${slotName} rack reset on cooldown (last: ${secsAgo}s ago)`);
-        }
-        continue;
-      }
-
-      // v2 reset button found but not active — send setpoint as step 1.
-      // On the next tick, if motor is still stopped, fall through to the WS
-      // escalation sequence (fault-reset + dual setpoint).
-      if (v2Result === "not-active" && !_watchdogMotorRetry.has(slotName)) {
-        _watchdogMotorRetry.set(slotName, Date.now());
-        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — reset btn not active, sending motor SP ${desiredMotorSp} R/hr`);
-        try {
-          await sendWsSetpoint(hmiTab.id, vesselId, "motor", desiredMotorSp);
-          _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${desiredMotorSp} R/hr`);
-          _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, note: "v2 not-active", envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
-        } catch (err) {
-          _log(`❌ [WATCHDOG] ${slotName} motor restart error: ${err.message}`);
-        }
-        continue;
-      }
-
-      // v2 button not found (or not-active on a subsequent tick) — fall through to WS setpoint retry sequence
-      if (_watchdogMotorRetry.has(slotName)) {
-        // Second attempt — first try didn't get it running
-        _watchdogMotorRetry.delete(slotName);
-        const failCount = (_watchdogMotorFailCount.get(slotName) ?? 0) + 1;
-        _watchdogMotorFailCount.set(slotName, failCount);
-        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STILL STOPPED — fault-reset + speed ${faultMotorSp}→${desiredMotorSp} R/hr (fail cycle ${failCount}/${RACK_RESET_THRESHOLD})`);
-        try {
-          await sendWsSetpoint(hmiTab.id, vesselId, "fault-reset", 1);
-          _log(`✅ [WATCHDOG] ${slotName} fault-reset sent`);
-          await new Promise((r) => setTimeout(r, 1500));
-          await sendWsSetpoint(hmiTab.id, vesselId, "motor", faultMotorSp);
-          _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${faultMotorSp} R/hr (unlock)`);
-          await new Promise((r) => setTimeout(r, 500));
-          await sendWsSetpoint(hmiTab.id, vesselId, "motor", desiredMotorSp);
-          _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${desiredMotorSp} R/hr (retry)`);
-          _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
-        } catch (err) {
-          _log(`❌ [WATCHDOG] ${slotName} motor retry error: ${err.message}`);
-        }
-        if (failCount >= RACK_RESET_THRESHOLD) {
-          const lastReset = _watchdogRackResetAt.get(slotName) ?? 0;
-          if (Date.now() - lastReset > RACK_RESET_COOLDOWN_MS) {
-            _watchdogRackResetAt.set(slotName, Date.now());
-            _watchdogMotorFailCount.delete(slotName);
-            await _resetRackForSlot(slotName, vesselId);
-          } else {
-            const secsAgo = Math.round((Date.now() - lastReset) / 1000);
-            _log(`⏳ [WATCHDOG] ${slotName} rack reset on cooldown (last: ${secsAgo}s ago)`);
-          }
-        }
-      } else {
-        // First attempt
-        _watchdogMotorRetry.set(slotName, Date.now());
-        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — sending speed ${desiredMotorSp} R/hr`);
-        try {
-          await sendWsSetpoint(hmiTab.id, vesselId, "motor", desiredMotorSp);
-          _log(`✅ [WATCHDOG] ${slotName} motor speed sent: ${desiredMotorSp} R/hr`);
-          _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
-        } catch (err) {
-          _log(`❌ [WATCHDOG] ${slotName} motor restart error: ${err.message}`);
         }
       }
       continue; // temp ctrl and blower deferred — motor must confirm running first
     }
 
-    const DECLOG_COOLDOWN_MS        = 60_000;
-    const BLOWER_COOLDOWN_MS        = 5 * 60_000;
-    const declogRecentlyCleared     = (v.lastDeclogClearedAt      ?? 0) > Date.now() - DECLOG_COOLDOWN_MS;
-    const blowerSetpointRecentlySent = (v.lastBlowerSetpointSentAt ?? 0) > Date.now() - BLOWER_COOLDOWN_MS;
-    const rawAirflowSp              = v.setpoints?.airflowSp;
+    const DECLOG_COOLDOWN_MS         = 60_000;
+    const BLOWER_COOLDOWN_MS         = 5 * 60_000;
+    const TEMP_COOLDOWN_MS           = 5 * 60_000;
+    const declogRecentlyCleared      = (v.lastDeclogClearedAt       ?? 0) > Date.now() - DECLOG_COOLDOWN_MS;
+    const blowerSetpointRecentlySent = (v.lastBlowerSetpointSentAt  ?? 0) > Date.now() - BLOWER_COOLDOWN_MS;
+    const tempSetpointRecentlySent   = (v.lastTempSetpointSentAt    ?? 0) > Date.now() - TEMP_COOLDOWN_MS;
+    const rawAirflowSp               = v.setpoints?.airflowSp;
     const LOW_AIRFLOW_THRESHOLD     = 30;
 
     // ── 4b. BLOWER ON but LOW AIRFLOW with zero/missing setpoint ────────────
@@ -3167,8 +3307,8 @@ async function _watchdogTick() {
       try {
         await sendWsSetpoint(hmiTab.id, vesselId, "blower", airSp);
         v.lastBlowerSetpointSentAt = Date.now();
-        _log(`✅ [WATCHDOG] ${slotName} airflow setpoint re-sent: ${airSp} l/min`);
-        _spLogRows.push({ date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "blower", value: airSp, note: "low airflow SP=0", envReading: pressure != null ? +pressure.toFixed(1) : "" });
+        _log(`✅ [WATCHDOG] ${slotName} airflow setpoint re-sent: ${airSp} l/min — confirming next tick`);
+        _pendingBlowerLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "blower", value: airSp, note: "low airflow SP=0", envReading: pressure != null ? +pressure.toFixed(1) : "" });
         setTimeout(collectAllSetpoints, 2000);
       } catch (err) {
         _log(`❌ [WATCHDOG] ${slotName} blower re-send error: ${err.message}`);
@@ -3194,17 +3334,21 @@ async function _watchdogTick() {
     // Guard: skip only when probe delta alarm is active (inSpanMitg AND delta
     // >= 10°F). If span mitigation is active but probes have converged (delta
     // < 10°F, not highlighted red), the HMI will accept the command — send it.
-    if (v.tempControlOn !== true && motorRunning && !probeDeltaAlarm && !tempNearSetpoint && vesselId != null) {
+    if (v.tempControlOn !== true && motorRunning && !probeDeltaAlarm && !tempNearSetpoint && !tempSetpointRecentlySent && vesselId != null) {
       const spanNote = inSpanMitg ? ` [span mitg, delta ${_pDelta.toFixed(1)}°F — probes OK]` : "";
       _log(`🌡️  [WATCHDOG] ${slotName} TEMP CTRL OFF (state: ${v.tempControlOn})${spanNote} — enabling @ ${tempSp}°F`);
       actionsFound++;
       try {
         await sendWsSetpoint(hmiTab.id, vesselId, "temp", tempSp);
-        _log(`✅ [WATCHDOG] ${slotName} temp ctrl enabled @ ${tempSp}°F`);
-        _spLogRows.push({ date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "temp", value: tempSp, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "", note: "temp ctrl off" });
+        v.lastTempSetpointSentAt = Date.now();
+        _log(`✅ [WATCHDOG] ${slotName} temp ctrl enabled @ ${tempSp}°F — confirming next tick`);
+        _pendingTempLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "temp", value: tempSp, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "", note: "temp ctrl off" });
       } catch (err) {
         _log(`❌ [WATCHDOG] ${slotName} temp ctrl error: ${err.message}`);
       }
+    } else if (v.tempControlOn !== true && tempSetpointRecentlySent) {
+      const secsAgo = Math.round((Date.now() - v.lastTempSetpointSentAt) / 1000);
+      _log(`⏳ [WATCHDOG] ${slotName} temp ctrl not on — setpoint sent ${secsAgo}s ago, awaiting confirmation (5 min cooldown)`);
     } else if (v.tempControlOn !== true && tempNearSetpoint) {
       _log(`⏸️  [WATCHDOG] ${slotName} temp ctrl not on — avg temp ${avgTempF.toFixed(1)}°F within 5°F of setpoint ${tempSp}°F, skipping`);
     } else if (v.tempControlOn !== true && probeDeltaAlarm) {
@@ -3227,8 +3371,8 @@ async function _watchdogTick() {
         }
         await sendWsSetpoint(hmiTab.id, vesselId, "blower", airSp);
         v.lastBlowerSetpointSentAt = Date.now();
-        _log(`✅ [WATCHDOG] ${slotName} airflow setpoint sent: ${airSp} l/min`);
-        _spLogRows.push({ date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "blower", value: airSp, envReading: pressure != null ? +pressure.toFixed(1) : "", note: valveFault ? "blower off + valve fault" : "blower off" });
+        _log(`✅ [WATCHDOG] ${slotName} airflow setpoint sent: ${airSp} l/min — confirming next tick`);
+        _pendingBlowerLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", spType: "blower", value: airSp, envReading: pressure != null ? +pressure.toFixed(1) : "", note: valveFault ? "blower off + valve fault" : "blower off" });
       } catch (err) {
         _log(`❌ [WATCHDOG] ${slotName} blower error: ${err.message}`);
       }
@@ -3299,7 +3443,117 @@ function _stopWatchdog() {
   _log("🤖 Watchdog STOPPED");
 }
 
-// Drive poll — reads watchdog_sync.json from Drive and applies state if newer than local
+// Pause all racks — disables watchdog then park-stops every occupied rack.
+// Called by the pause-all-racks message handler and by _drivePoll() for remote commands.
+// triggeredBy is shown in the watchdog log and Drive changedBy field.
+async function _executePauseAll(triggeredBy = "pause-all") {
+  const time = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const disabledState = {
+    enabled: false,
+    changedBy: triggeredBy,
+    ownedBy: null,
+    time,
+    changedAt: Date.now(),
+  };
+  await new Promise(resolve => {
+    chrome.storage.local.get(["watchdog_log"], ({ watchdog_log = [] }) => {
+      const byLabel = triggeredBy === "remote-pause" ? "Remote Pause All" : "Pause All Racks";
+      const entry = { time, type: "toggle", action: "Disabled", by: byLabel, ts: Date.now() };
+      const log = [entry, ...watchdog_log].slice(0, 100);
+      chrome.storage.local.set({ watchdog_state: disabledState, watchdog_log: log }, resolve);
+    });
+  });
+  _driveLastKnownAt = disabledState.changedAt;
+  writeDriveState(disabledState).catch(e => _log("⚠️ [DRIVE SYNC] Write failed:", e.message));
+  _log(`🤖 Watchdog DISABLED by ${triggeredBy}`);
+
+  const tabs = await chrome.tabs.query({});
+  const hmiTab = tabs.find((t) => t.url?.includes("/internal/hmi/"));
+  if (!hmiTab) {
+    _log("⚠️ pause-all: HMI tab not found — watchdog disabled, rack pause skipped");
+    return { ok: false, error: "HMI tab not found", watchdogDisabled: true };
+  }
+
+  const byRack = {};
+  for (const [slotName, v] of Object.entries(dashboardState)) {
+    const rack = slotName.slice(0, 3);
+    if (!byRack[rack]) byRack[rack] = {};
+    byRack[rack][slotName] = v;
+  }
+
+  let hallViewClicked = 0;
+  const parkStopResults = [];
+
+  try {
+    for (const [rack, slots] of Object.entries(byRack)) {
+      const aSlotName = `${rack}A`;
+      const aVessel = slots[aSlotName];
+      const aOccupied = aVessel &&
+        aVessel.vesselPresent !== false &&
+        (aVessel.mechanicalStatus || "").toLowerCase() !== "wait_vessel";
+
+      if (aOccupied) {
+        // Slot A occupied — use the hall-view rack group footer button.
+        const result = await chrome.scripting.executeScript({
+          target: { tabId: hmiTab.id },
+          world: "MAIN",
+          func: (rackNum) => {
+            const groups = document.querySelectorAll(
+              "#vessels_hall_view .hmi_vessels_view__content__rack_groups > div",
+            );
+            for (const group of groups) {
+              const header = group.querySelector(
+                ".hmi_vessels_view__content__rack_groups__group__header",
+              );
+              if (header && header.textContent.trim().startsWith(String(parseInt(rackNum, 10)))) {
+                const btn = group.querySelector(
+                  ".hmi_vessels_view__content__rack_groups__group__footer div > a",
+                );
+                if (btn) { btn.click(); return true; }
+              }
+            }
+            // Fall back: click any footer button in any group (original broad sweep for this rack).
+            for (const group of groups) {
+              const btn = group.querySelector(
+                ".hmi_vessels_view__content__rack_groups__group__footer div > a",
+              );
+              if (btn) { btn.click(); return true; }
+            }
+            return false;
+          },
+          args: [rack],
+        });
+        if (result?.[0]?.result) hallViewClicked++;
+      } else {
+        // Slot A empty — park-stop each occupied non-A slot via silent v2 card tab.
+        for (const [slotName, v] of Object.entries(slots)) {
+          if (slotName === aSlotName) continue;
+          const occupied = v.vesselPresent !== false &&
+            v.vesselId != null &&
+            (v.mechanicalStatus || "").toLowerCase() !== "wait_vessel";
+          if (!occupied) continue;
+          const res = await _parkStopSlotV2(slotName, v.vesselId);
+          parkStopResults.push({ slotName, res });
+        }
+      }
+    }
+
+    _log(`✅ ${triggeredBy} — hall-view: ${hallViewClicked}, park-stop: ${JSON.stringify(parkStopResults)}`);
+    setTimeout(syncRackPauseState, 800);
+    return { ok: true, hallViewClicked, parkStopResults };
+  } catch (err) {
+    console.error(`❌ ${triggeredBy} error:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+// Drive poll — reads watchdog_sync.json from Drive and applies state if newer than local.
+// Also handles pendingCommand fields written by the remote-control web app:
+//   pause_all  → disable watchdog + park-stop all occupied racks (via _executePauseAll)
+//   restart_all → enable watchdog (storage change listener starts the interval)
+// Commands older than 10 minutes are silently ignored (stale protection).
+// The Apps Script must always bump changedAt when writing a pendingCommand so the
+// early-exit guard doesn't prevent processing.
 async function _drivePoll() {
   try {
     const remote = await readDriveState();
@@ -3309,6 +3563,43 @@ async function _drivePoll() {
     }
     _log(`🌐 [DRIVE SYNC] Poll — watchdog ${remote.enabled ? `✅ running on ${remote.ownedBy ?? "unknown"}` : "⛔ disabled"}`);
     if (remote.changedAt <= _driveLastKnownAt) return;
+
+    // Remote command from the bookmarklet/web-app control panel.
+    const cmd = remote.pendingCommand;
+    const cmdAge = Date.now() - (remote.commandIssuedAt ?? 0);
+    if (cmd && cmdAge < 10 * 60_000 && _isWatchdogOwner()) {
+      if (cmd === "pause_all") {
+        _log(`🌐 [DRIVE SYNC] Remote command: pause_all (age: ${Math.round(cmdAge / 1000)}s)`);
+        // _executePauseAll writes a fresh disabled state (no pendingCommand) back to Drive
+        // and updates _driveLastKnownAt, so subsequent polls see nothing to process.
+        await _executePauseAll("remote-pause");
+        return;
+      } else if (cmd === "restart_all") {
+        _log(`🌐 [DRIVE SYNC] Remote command: restart_all (age: ${Math.round(cmdAge / 1000)}s)`);
+        const now = Date.now();
+        const logTime = new Date().toLocaleTimeString("en-US", { hour12: false });
+        const newState = {
+          enabled: true,
+          changedBy: "remote-restart",
+          ownedBy: _machineIp,
+          time: logTime,
+          changedAt: now,
+        };
+        _driveLastKnownAt = now;
+        await writeDriveState(newState);
+        await new Promise(resolve => {
+          chrome.storage.local.get(["watchdog_log"], ({ watchdog_log = [] }) => {
+            const entry = { time: logTime, type: "toggle", action: "Enabled", by: "Remote Restart All", ts: now };
+            const log = [entry, ...watchdog_log].slice(0, 100);
+            chrome.storage.local.set({ watchdog_state: newState, watchdog_log: log }, resolve);
+          });
+        });
+        _log("🤖 Watchdog ENABLED by remote-restart");
+        // Storage change listener (_startWatchdog) fires automatically from the set above.
+        return;
+      }
+    }
+
     const local = await new Promise(r => chrome.storage.local.get(["watchdog_state"], r));
     const localAt = local.watchdog_state?.changedAt ?? 0;
     if (remote.changedAt > localAt) {

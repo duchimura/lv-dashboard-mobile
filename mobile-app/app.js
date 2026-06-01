@@ -196,6 +196,60 @@ function renderFleet(fleet) {
   document.querySelector(".fleet-chip.off .count").textContent      = fleet.off;
 }
 
+/* ── Watchdog control bar ────────────────────────────────────────────────── */
+let _confirmingAction = null;
+
+function renderWatchdog(watchdog) {
+  if (_confirmingAction) return; // don't overwrite confirmation UI during a data refresh
+  const bar      = document.getElementById("watchdog-bar");
+  const statusEl = document.getElementById("watchdog-status");
+  const btnsEl   = document.getElementById("watchdog-btns");
+  if (!watchdog) { bar.style.display = "none"; return; }
+  bar.style.display = "";
+  const on = !!watchdog.enabled;
+  statusEl.innerHTML =
+    `Watchdog&nbsp;<span class="wd-badge ${on ? "on" : "off"}">${on ? "ENABLED" : "DISABLED"}</span>`;
+  btnsEl.style.display =
+    (typeof REMOTE_CONTROL_URL === "string" && REMOTE_CONTROL_URL) ? "" : "none";
+}
+
+function _promptWatchdogCmd(action) {
+  _confirmingAction = action;
+  document.getElementById("watchdog-bar").style.display  = "none";
+  document.getElementById("watchdog-conf").style.display = "";
+  document.getElementById("wdconf-label").textContent = action === "pause_all"
+    ? "Pause all racks + disable watchdog?"
+    : "Restart all racks + enable watchdog?";
+}
+
+function _cancelWatchdogConf() {
+  _confirmingAction = null;
+  document.getElementById("watchdog-conf").style.display = "none";
+  if (_currentData) renderWatchdog(_currentData.watchdog ?? null);
+}
+
+async function _sendWatchdogCmd(action) {
+  _confirmingAction = null;
+  document.getElementById("watchdog-conf").style.display = "none";
+  if (_currentData) renderWatchdog(_currentData.watchdog ?? null);
+
+  const msgEl = document.getElementById("watchdog-msg");
+  msgEl.textContent = "Sending…";
+  msgEl.className = "watchdog-msg visible";
+  try {
+    const fd = new FormData();
+    fd.append("action", action);
+    const res  = await fetch(REMOTE_CONTROL_URL, { method: "POST", body: fd });
+    const data = await res.json();
+    msgEl.textContent = data.ok ? `✓ ${data.message}` : `✗ ${data.error || "Error"}`;
+    msgEl.className   = `watchdog-msg visible ${data.ok ? "ok" : "err"}`;
+  } catch (e) {
+    msgEl.textContent = "✗ Network error";
+    msgEl.className   = "watchdog-msg visible err";
+  }
+  setTimeout(() => { msgEl.className = "watchdog-msg"; }, 5000);
+}
+
 /* ── Detail view ─────────────────────────────────────────────────────────── */
 function openDetail(v) {
   document.getElementById("detail-title").textContent =
@@ -283,6 +337,7 @@ function render(data) {
   document.getElementById("grid").style.display = "";
   document.getElementById("fleet-summary").style.display = "";
   if (data.fleet) renderFleet(data.fleet);
+  renderWatchdog(data.watchdog ?? null);
   renderGrid(data);
   checkStale(data.updated);
 }
@@ -315,6 +370,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // In-app back arrow uses history.back() so popstate fires and both
   // the browser back button and the in-app button share one code path
+  document.getElementById("btn-pause-all").addEventListener("click",   () => _promptWatchdogCmd("pause_all"));
+  document.getElementById("btn-restart-all").addEventListener("click", () => _promptWatchdogCmd("restart_all"));
+  document.getElementById("btn-wdconf-cancel").addEventListener("click", () => _cancelWatchdogConf());
+  document.getElementById("btn-wdconf-ok").addEventListener("click",    () => _sendWatchdogCmd(_confirmingAction));
   document.getElementById("detail-back").addEventListener("click", () => history.back());
   window.addEventListener("popstate", () => {
     if (document.getElementById("detail").classList.contains("open")) {
