@@ -3010,6 +3010,12 @@ async function _watchdogTick() {
     const waitVessel = (v.mechanicalStatus || "").toLowerCase() === "wait_vessel";
     if (powerInactive || waitVessel) continue;
 
+    // New vessel — block all watchdog action until operator submits first setpoints
+    if (v.setpointsInitialized === false) {
+      _log(`⏳ [WATCHDOG] ${slotName} skipping — awaiting first operator setpoints`);
+      continue;
+    }
+
     // Pause check — rackGroupPaused is absolute when A is occupied (deliberate group pause).
     // Nothing overrides it, including faults. When A is empty the HMI auto-activates
     // "reset rack" — that is NOT a deliberate pause and B/C slots still need watchdog care,
