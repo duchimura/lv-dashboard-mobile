@@ -1726,6 +1726,12 @@ async function refreshRackState() {
           );
         }
 
+        // New vessel arrived → gate the watchdog until operator submits first setpoints
+        if (!wasPresent && isPresent) {
+          dashboardState[slot].setpointsInitialized = false;
+          _log(`🆕 refreshRackState: new vessel in ${slot} — watchdog gated until first setpoints`);
+        }
+
         // Broadcast on vessel-presence change OR mechanicalStatus change
         // (pause/unpause from HMI must propagate immediately).
         // Always broadcast for empty slots so the dashboard recovers if it
@@ -2993,52 +2999,32 @@ async function _watchdogTick() {
     const waitVessel = (v.mechanicalStatus || "").toLowerCase() === "wait_vessel";
     if (powerInactive || waitVessel) continue;
 
-    // Compute motor action need early so skip logic can use it.
-    // MIXER_STOPPED / MIXER_FAULTED / VALVE_FAULT all require watchdog intervention
-    // regardless of rack pause state — an unexpected hardware stop takes priority.
-    const _earlyMixerUpper = (v.mixerModuleStatus || "").toUpperCase();
-    const _motorNeedsAction = _earlyMixerUpper === "MIXER_STOPPED" ||
-                              _earlyMixerUpper === "MIXER_FAULTED" ||
-                              v.valveModuleStatus === "VALVE_FAULT";
-
-    // ctrl_inactive = motor control disabled by HMI; may be recoverable.
-    // Only skip if the rack group is also deliberately paused (A slot occupied),
-    // which confirms an operator intentionally stopped this slot.
-    const ctrlInactive = (v.mechanicalStatus || "").toLowerCase().includes("ctrl_inactive");
-    if (ctrlInactive && v.rackGroupPaused === true) {
+    // Pause check — rackGroupPaused is absolute when A is occupied (deliberate group pause).
+    // Nothing overrides it, including faults. When A is empty the HMI auto-activates
+    // "reset rack" — that is NOT a deliberate pause and B/C slots still need watchdog care,
+    // UNLESS the slot was individually paused (ctrl_inactive on its own mechanical status).
+    if (v.rackGroupPaused === true) {
       const aSlotName = slotName.replace(/[A-Z]$/, "A");
       const aSlot = dashboardState[aSlotName];
-      // wait_vessel on A (even with a faulted status) means the slot is physically empty —
-      // treat it the same as no vessel so B/C slots are not incorrectly skipped.
+      // wait_vessel on A (even with a faulted status) means physically empty —
+      // treat the same as no vessel so B/C slots are not incorrectly skipped.
       const aWaitVessel = (aSlot?.mechanicalStatus || "").toLowerCase() === "wait_vessel";
       const aHasVessel = aSlot?.vesselPresent === true && !aWaitVessel;
-      if (aHasVessel) {
-        _log(`⏸️  [WATCHDOG] ${slotName} skipping — ctrl_inactive + rack manually paused`);
-        continue;
-      }
-    }
 
-    // rackGroupPaused is set when the HMI shows "reset rack" for this column.
-    // The HMI also sets this automatically when the A position is empty — that is
-    // NOT a manual pause, and B/C slots should continue to be monitored.
-    // We treat it as an intentional pause only when the A slot also has a vessel,
-    // which means an operator explicitly paused a running rack group.
-    // A slot showing wait_vessel (even combined with a faulted status) is physically
-    // empty; the HMI activates "reset rack" automatically in that state, so it is
-    // NOT a manual pause and B/C slots still need watchdog care.
-    // Exception: when the motor is stopped or faulted the skip is bypassed — an
-    // unexpected hardware stop must be addressed even if the HMI shows "reset rack"
-    // (e.g. the stop itself caused the HMI to surface the reset button for that column).
-    if (v.rackGroupPaused === true && !_motorNeedsAction) {
-      const aSlotName = slotName.replace(/[A-Z]$/, "A");
-      const aSlot = dashboardState[aSlotName];
-      const aWaitVessel = (aSlot?.mechanicalStatus || "").toLowerCase() === "wait_vessel";
-      const aHasVessel = aSlot?.vesselPresent === true && !aWaitVessel;
       if (aHasVessel) {
-        _log(`⏸️  [WATCHDOG] ${slotName} skipping — rack manually paused (A position occupied)`);
+        // Deliberate group pause — absolute, nothing overrides including faults.
+        _log(`⏸️  [WATCHDOG] ${slotName} skipping — rack group paused (A occupied)`);
         continue;
       }
-      // No vessel in A (or A shows wait_vessel) → HMI auto-pause; B/C slots still need watchdog care — fall through
+
+      // A is empty: HMI auto-pause. Skip only if this slot was individually paused
+      // (ctrl_inactive = operator manually stopped this specific slot via HMI).
+      const ctrlInactive = (v.mechanicalStatus || "").toLowerCase().includes("ctrl_inactive");
+      if (ctrlInactive) {
+        _log(`⏸️  [WATCHDOG] ${slotName} skipping — individually paused (ctrl_inactive, A empty)`);
+        continue;
+      }
+      // A empty + not individually paused → HMI auto-pause only; fall through to monitor.
     }
 
     const vesselLabel = v.vesselName ? `${slotName} (${v.vesselName})` : slotName;
@@ -3226,15 +3212,16 @@ async function _watchdogTick() {
       }
 
       if (v2Result === "sp-sent" || v2Result === "sp-nudged") {
-        const note = v2Result === "sp-nudged" ? `park-stop nudge ${faultMotorSp}→${desiredMotorSp}` : `park-stop SP ${desiredMotorSp}`;
-        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — ${note} injected via v2 field — confirming next tick`);
-        _watchdogMotorRetry.set(slotName, Date.now());
-        _watchdogMotorFailCount.set(slotName, (_watchdogMotorFailCount.get(slotName) ?? 0) + 1);
-        _pendingMotorLog.set(slotName, { date: _tickDate, time: _tickTime, slotId: slotName, vesselNumber: v.vesselName ?? "", value: desiredMotorSp, note, envReading: avgTempF != null ? +avgTempF.toFixed(1) : "" });
-        continue;
+        // v2 DOM SP injection was attempted (park-stop state), but MIXER_STOPPED also
+        // requires a WS fault-reset to clear the motor drive stopped latch.
+        // The DOM injection alone is not sufficient — fall through to the
+        // fault-reset + dual SP block below instead of short-circuiting.
+        const _v2Note = v2Result === "sp-nudged" ? `park-stop nudge ${faultMotorSp}→${desiredMotorSp}` : `park-stop SP ${desiredMotorSp}`;
+        _log(`🟡 [WATCHDOG] ${slotName} MOTOR STOPPED — ${_v2Note} injected via v2 — also sending WS fault-reset`);
       }
 
-      // v2 button not clicked / not usable — send fault-reset + dual setpoint every attempt.
+      // v2 button not clicked / not usable (or sp-sent/sp-nudged above) —
+      // send fault-reset + dual setpoint every attempt.
       //
       // Why not "try a plain SP first, then escalate"?
       //   • When a motor stops the HMI SP field still holds the last running value
