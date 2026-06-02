@@ -898,6 +898,17 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // wait for real state from HMI/API
         }
 
+        // Unlock watchdog once operator has explicitly set all three setpoints
+        if (
+          vessel.setpoints.tempSp != null &&
+          vessel.setpoints.motorSp != null &&
+          vessel.setpoints.airflowSp != null &&
+          dashboardState[slotName]?.setpointsInitialized === false
+        ) {
+          dashboardState[slotName].setpointsInitialized = true;
+          _log(`✅ [setpoint:set] ${slotName} — all three setpoints entered, watchdog unlocked`);
+        }
+
         safeSend({
           type: "dashboard:update",
           slotName,
