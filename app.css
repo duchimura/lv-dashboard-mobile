@@ -194,7 +194,7 @@ body {
 
 /* ── Card telemetry values ───────────────────────────────────────────────── */
 .card-telem {
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.7;
   color: #e0e0e0;
 }
