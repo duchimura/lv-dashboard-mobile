@@ -51,6 +51,13 @@ function _writeState(state) {
 // ─── Web App Handlers ────────────────────────────────────────────────────────
 
 function doGet(e) {
+  // Mobile app sends GET ?action=pause_all|restart_all to avoid the CORS/redirect
+  // issue that Apps Script POST triggers when called cross-origin from a PWA.
+  var action = e && e.parameter && e.parameter.action;
+  if (action === "pause_all" || action === "restart_all") {
+    return _handleAction(action);
+  }
+
   var state;
   var error = null;
   try {
@@ -130,7 +137,11 @@ function doPost(e) {
   if (action !== "pause_all" && action !== "restart_all") {
     return _json({ ok: false, error: "Unknown action: " + action });
   }
+  return _handleAction(action);
+}
 
+// Shared handler — called by both doGet (mobile app) and doPost (bookmarklet iframe).
+function _handleAction(action) {
   try {
     var state = _readState();
     var now   = Date.now();

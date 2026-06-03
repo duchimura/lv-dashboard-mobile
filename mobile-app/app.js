@@ -237,9 +237,8 @@ async function _sendWatchdogCmd(action) {
   msgEl.textContent = "Sending…";
   msgEl.className = "watchdog-msg visible";
   try {
-    const fd = new FormData();
-    fd.append("action", action);
-    const res  = await fetch(REMOTE_CONTROL_URL, { method: "POST", body: fd });
+    // GET avoids the CORS/redirect issue that Apps Script POST triggers.
+    const res  = await fetch(REMOTE_CONTROL_URL + "?action=" + encodeURIComponent(action));
     const data = await res.json();
     msgEl.textContent = data.ok ? `✓ ${data.message}` : `✗ ${data.error || "Error"}`;
     msgEl.className   = `watchdog-msg visible ${data.ok ? "ok" : "err"}`;
