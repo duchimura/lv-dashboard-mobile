@@ -243,7 +243,7 @@ async function _sendWatchdogCmd(action) {
     msgEl.textContent = data.ok ? `✓ ${data.message}` : `✗ ${data.error || "Error"}`;
     msgEl.className   = `watchdog-msg visible ${data.ok ? "ok" : "err"}`;
   } catch (e) {
-    msgEl.textContent = "✗ Network error";
+    msgEl.textContent = "✗ " + (e.message || "Network error");
     msgEl.className   = "watchdog-msg visible err";
   }
   setTimeout(() => { msgEl.className = "watchdog-msg"; }, 5000);
