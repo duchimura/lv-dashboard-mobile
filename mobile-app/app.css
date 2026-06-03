@@ -235,9 +235,9 @@ body {
   display: block;
   width: 18px;
   height: 18px;
+  border-top: 4px solid #0f0;
   border-left: 4px solid #0f0;
-  border-bottom: 4px solid #0f0;
-  transform: rotate(45deg);
+  transform: rotate(-45deg);
   border-radius: 2px;
 }
 #detail-title { font-size: 16px; font-weight: bold; color: #f2e8d5; flex: 1; }
